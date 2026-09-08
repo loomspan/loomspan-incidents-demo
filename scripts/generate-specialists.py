@@ -1,0 +1,61 @@
+"""Generate the three focused specialist manifests with identical receipt contracts."""
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[1] / 'src/main/resources/skills'
+for domain, probe, mission in [
+    ('Application', 'inspectApplication', 'Interpret checkout health, logs and deployment history. Distinguish a process outage, code regression and dependency symptom.'),
+    ('Network', 'inspectNetwork', 'Interpret DNS, firewall and connectivity evidence. Distinguish blocked traffic from an allowed path to an unavailable dependency.'),
+    ('Database', 'inspectDatabase', 'Interpret local database health and readiness. A healthy local check does not prove the application network path works.'),
+]:
+    (root / f'investigate{domain}.yml').write_text(f'''name: investigate{domain}
+description: {mission}
+model: investigator
+allowed_skills:
+  - name: {probe}
+prompt: |
+  {mission}
+  Call {probe} with the exact runId. Never invent a receipt or observation.
+  Return a concise summary and copy every field of the returned receipt into receipts.
+  Preserve the receipt ID and supported action IDs exactly, including healthy observations
+  with empty actions. Do not treat a suggested repair as executed or claim recovery.
+input_schema:
+  type: object
+  properties:
+    runId: {{ type: string }}
+    context: {{ type: string }}
+  required: [runId, context]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      evidence: {probe}
+    receipts:
+      type: array
+      evidence: {probe}
+      items:
+        type: object
+        properties:
+          id: {{ type: string }}
+          runId: {{ type: string }}
+          revision: {{ type: integer }}
+          observedAt: {{ type: string }}
+          probe: {{ type: string }}
+          observation: {{ type: string }}
+          actions:
+            type: array
+            items:
+              type: object
+              properties:
+                id: {{ type: string }}
+                label: {{ type: string }}
+                effect: {{ type: string }}
+              required: [id, label, effect]
+              additionalProperties: false
+        required: [id, runId, revision, observedAt, probe, observation, actions]
+        additionalProperties: false
+  required: [summary, receipts]
+  additionalProperties: false
+output_schema_max_retries: 2
+''', encoding='utf-8')

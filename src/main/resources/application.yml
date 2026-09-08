@@ -1,0 +1,43 @@
+server:
+  address: 127.0.0.1
+  port: ${RELAY_PORT:8083}
+spring:
+  application:
+    name: relay
+  datasource:
+    url: ${RELAY_DATABASE_URL:jdbc:h2:file:./data/relay;DB_CLOSE_ON_EXIT=FALSE;LOCK_TIMEOUT=10000}
+    username: sa
+    password: ''
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+loomspan:
+  connections:
+    incidents:
+      driver: openai
+      base-url: ${RELAY_MODEL_BASE_URL:https://api.openai.com/v1}
+      api-key: ${OPENAI_API_KEY:not-configured}
+      provider-retry:
+        max-attempts: 2
+  models:
+    investigator:
+      connection: incidents
+      provider-model: ${RELAY_MODEL:gpt-4.1}
+  skills:
+    locations:
+      - classpath:/skills/*.yml
+  session:
+    mission-timeout: 240s
+    max-depth: 4
+    quotas:
+      max-skill-invocations: 30
+      max-tool-invocations: 40
+      max-model-calls: 45
+      max-provider-attempts: 65
+      max-usage-units: 180000
+  observability:
+    enabled: ${RELAY_OBSERVABILITY_ENABLED:false}
+    auth:
+      api-key: ${RELAY_OBSERVABILITY_API_KEY:}
+execution-trace:
+  persistence: ${RELAY_TRACE_PERSISTENCE:ALWAYS}

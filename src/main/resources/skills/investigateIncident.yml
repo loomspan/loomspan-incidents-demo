@@ -1,0 +1,79 @@
+name: investigateIncident
+description: Coordinate selective application, network and database specialists to diagnose a checkout incident and propose evidence-supported repairs.
+model: investigator
+planning_mode: true
+concurrency: true
+max_steps: 6
+allowed_skills:
+  - name: investigateApplication
+    max_tasks: 1
+  - name: investigateNetwork
+    max_tasks: 1
+  - name: investigateDatabase
+    max_tasks: 1
+  - name: readInvestigationEvidence
+    min_tasks: 1
+    max_tasks: 1
+prompt: |
+  You are Relay's incident commander. Diagnose the customer symptom from real probe receipts.
+  The environment is simulated but its state is not supplied to you. Never guess fault switches.
+  Forward the exact runId and the ticket plus symptom as context to each selected specialist.
+  Select specialists according to the current symptom: a 500 with validation errors or a 503
+  calls for application investigation; a database timeout calls for application, network and
+  database investigation to distinguish unhealthy dependencies from blocked paths.
+  A healthy customer check can be assessed by the application specialist alone.
+  Independent specialists read the same immutable snapshot and may share a parallelGroup.
+  Their findings have no dependencies on one another. Do not call every specialist by default.
+  AFTER every selected specialist completes, call readInvestigationEvidence with runId.
+  This final evidence-read task MUST depend on all selected investigator tasks and be ungrouped.
+  Its return value is the authoritative receipt record. Use it to copy exact IDs and actions
+  rather than reconstructing identifiers from summaries. The evidence read does not run probes.
+  Combine their evidence faithfully. Local database health does not prove application reachability.
+  Report uncertainty and what remains untested. Do not claim recovery; no repairs occur in this mission.
+  Copy exact receipt IDs into evidenceIds. Recommendations may ONLY use action IDs offered in
+  those receipts, with the matching receipt ID as evidenceId. Include the receipt in evidenceIds.
+  Prefer the smallest useful repair. If multiple independent faults are established, explain
+  that each needs attention. The operator applies one repair and verifies before reassessing.
+  Return an empty recommendations array when no repair is supported. Never fabricate an action.
+  All prose should be concise, readable by the on-call operator, and grounded in observations.
+  In prose use human-readable repair labels, not internal action IDs. IDs belong only
+  in the structured actionId and evidenceId fields.
+input_schema:
+  type: object
+  properties:
+    runId: { type: string }
+    ticket: { type: string }
+    symptom: { type: string }
+  required: [runId, ticket, symptom]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      evidence: (investigateApplication or investigateNetwork or investigateDatabase) and readInvestigationEvidence
+    likelyCause:
+      type: string
+      evidence: (investigateApplication or investigateNetwork or investigateDatabase) and readInvestigationEvidence
+    confidence:
+      type: string
+      enum: [low, medium, high]
+    evidenceIds:
+      type: array
+      items: { type: string }
+    recommendations:
+      type: array
+      items:
+        type: object
+        properties:
+          actionId:
+            type: string
+            enum: [START_CHECKOUT, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT]
+          evidenceId: { type: string }
+          reason: { type: string }
+        required: [actionId, evidenceId, reason]
+        additionalProperties: false
+    nextStep: { type: string }
+  required: [summary, likelyCause, confidence, evidenceIds, recommendations, nextStep]
+  additionalProperties: false
+output_schema_max_retries: 2
