@@ -28,6 +28,11 @@ public final class Contracts {
     public record Preset(String name, Integer expectedRevision) {}
     public record NewIncident(String title) {}
     public record RepairRequest(String runId, String actionId) {}
+    public record InvestigationOptions(String mode, List<String> allowedActions, Integer maxRepairs) {}
+    public record Operation(String id, String incidentId, String createdAt, String mode,
+                            List<String> allowedActions, int maxRepairs, int repairs, String status,
+                            String currentRunId, int expectedRevision, String message) {}
+    public record Correction(String status, String reason, String sessionId, List<ExecutionEvent> events) {}
     public record Action(String id, String label, String effect) {}
     public record Receipt(String id, String runId, int revision, String observedAt,
                           String probe, String observation, List<Action> actions) {}
@@ -37,9 +42,9 @@ public final class Contracts {
     public record ExecutionEvent(String timestamp, String type, String frameId, String route) {}
     public record Run(String id, String incidentId, String status, String createdAt, World snapshot,
                       Report report, String sessionId, List<ExecutionEvent> events, String error,
-                      List<Receipt> evidence) {}
+                      List<Receipt> evidence, String mode, Correction correction) {}
     public record Incident(String id, String title, String status, String createdAt, String lastRunId) {}
     public record Activity(long id, String incidentId, String createdAt, String kind, String message, int revision) {}
-    public record Detail(Incident incident, List<Run> runs, List<Activity> activity) {}
+    public record Detail(Incident incident, List<Run> runs, List<Activity> activity, List<Operation> operations) {}
     public record State(World environment, TransactionResult checkout, Capacity capacity, DataLoad dataLoad, List<Incident> incidents, List<Activity> activity) {}
 }

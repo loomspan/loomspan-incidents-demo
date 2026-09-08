@@ -25,7 +25,7 @@ class IncidentApplicationTest {
     @Autowired SkillTemplate skills;
     @LocalServerPort int port;
     @BeforeEach void reset() {
-        for(String table:List.of("repair","activity","evidence","investigation","incident")) db.update("delete from "+table);
+        for(String table:List.of("repair","activity","evidence","investigation","operation","incident")) db.update("delete from "+table);
         db.update("update environment set revision=1,checkout_running=true,database_running=true,link_allowed=true,bad_deploy=false,checkout_b_running=true,demand_rps=60,cache_running=true,cache_hit_percent=90");
     }
     private Run prepare(String preset) {

@@ -59,6 +59,7 @@ public class IncidentStore {
             case "compound" -> new World(w.revision()+1,true,true,false,true,true,60,true,90);
             case "redundancy" -> new World(w.revision()+1,true,true,true,false,false,60,true,90);
             case "cache" -> new World(w.revision()+1,true,true,true,false,true,150,false,90);
+            case "cache-compound" -> new World(w.revision()+1,true,true,true,false,true,150,false,20);
             case "cache-degraded" -> new World(w.revision()+1,true,true,true,false,true,150,true,20);
             case "overload" -> new World(w.revision()+1,true,true,true,false,false,150,true,90);
             default -> throw ApiProblem.bad("Unknown preset.");
@@ -100,7 +101,7 @@ public class IncidentStore {
         return db.query("select receipt_json from evidence where run_id=? order by created_at,id",(rs,n)->decode(rs.getString(1),Receipt.class),runId);
     }
     public Run run(String id) {
-        var rows=db.query("select * from investigation where id=?",(rs,n)->new Run(rs.getString("id"),rs.getString("incident_id"),rs.getString("status"),rs.getString("created_at"),decode(rs.getString("snapshot_json"),World.class),decode(rs.getString("report_json"),Report.class),rs.getString("session_id"),List.of(decode(rs.getString("events_json"),ExecutionEvent[].class)),rs.getString("error_message"),receipts(id)),id);
+        var rows=db.query("select investigation.*,coalesce(operation.mode,'RECOMMEND') as execution_mode from investigation left join operation on operation.id=investigation.operation_id where investigation.id=?",(rs,n)->new Run(rs.getString("id"),rs.getString("incident_id"),rs.getString("status"),rs.getString("created_at"),decode(rs.getString("snapshot_json"),World.class),decode(rs.getString("report_json"),Report.class),rs.getString("session_id"),List.of(decode(rs.getString("events_json"),ExecutionEvent[].class)),rs.getString("error_message"),receipts(id),rs.getString("execution_mode"),decode(rs.getString("correction_json"),Correction.class)),id);
         if(rows.isEmpty()) throw ApiProblem.missing(); return rows.getFirst();
     }
     public List<Activity> activities(String incidentId) {
@@ -111,12 +112,16 @@ public class IncidentStore {
     public Detail detail(String id) {
         Incident i=incident(id);
         var runs=db.query("select id from investigation where incident_id=? order by created_at desc",(rs,n)->run(rs.getString(1)),id);
-        return new Detail(i,runs,activities(id));
+        return new Detail(i,runs,activities(id),operations(id));
     }
     public State state() { World w=world(); return new State(w,Simulation.checkout(w),Simulation.capacity(w),Simulation.dataLoad(w),incidents(),activities(null)); }
     @Transactional
     public Run begin(String incidentId) {
-        lockWorld(); lockIncident(incidentId); Incident i=incident(incidentId);
+        lockWorld(); lockIncident(incidentId); idle(incidentId);
+        return beginInternal(incidentId);
+    }
+    private Run beginInternal(String incidentId) {
+        Incident i=incident(incidentId);
         if("RESOLVED".equals(i.status())) throw ApiProblem.conflict("This incident is resolved. Open a new incident for a new failure.");
         if("INVESTIGATING".equals(i.status())) throw ApiProblem.conflict("An investigation is already running for this incident.");
         World w=world(); String runId=id();
@@ -145,6 +150,7 @@ public class IncidentStore {
         String status=db.queryForObject("select status from investigation where id=? for update",String.class,runId);
         if(!"RUNNING".equals(status)) return;
         validate(report,receipts(runId));
+        if(r.mode().equals("OBSERVE")) report=new Report(report.summary(),report.likelyCause(),report.confidence(),report.evidenceIds(),List.of(),"Observation only. Start a Recommend or Auto-repair investigation to authorize repairs.");
         db.update("update investigation set status='COMPLETE',report_json=?,session_id=?,events_json=? where id=?",encode(report),sessionId,encode(events),runId);
         db.update("update incident set status='DIAGNOSED' where id=? and last_run_id=?",r.incidentId(),runId);
         activity(r.incidentId(),"DIAGNOSIS","Investigation completed with "+report.recommendations().size()+" proposed repair(s).",r.snapshot().revision());
@@ -172,7 +178,12 @@ public class IncidentStore {
     }
     @Transactional
     public World repair(String incidentId, RepairRequest request) {
-        lockWorld(); lockIncident(incidentId); Incident i=incident(incidentId); Run r=run(request.runId());
+        lockWorld(); lockIncident(incidentId); idle(incidentId);
+        return repairInternal(incidentId,request);
+    }
+    private World repairInternal(String incidentId, RepairRequest request) {
+        Incident i=incident(incidentId); Run r=run(request.runId());
+        if("OBSERVE".equals(r.mode())) throw ApiProblem.conflict("Observe mode cannot authorize repairs. Start a Recommend or Auto-repair investigation.");
         if(!r.incidentId().equals(incidentId)) throw ApiProblem.bad("The investigation belongs to another incident.");
         // Retrying an already committed request cannot mutate the world twice.
         if(db.queryForObject("select count(*) from repair where run_id=? and action_id=?",Integer.class,r.id(),request.actionId())>0) return world();
@@ -188,7 +199,11 @@ public class IncidentStore {
     }
     @Transactional
     public RecoveryResult verify(String incidentId) {
-        lockWorld(); lockIncident(incidentId); Incident i=incident(incidentId);
+        lockWorld(); lockIncident(incidentId); idle(incidentId);
+        return verifyInternal(incidentId);
+    }
+    private RecoveryResult verifyInternal(String incidentId) {
+        Incident i=incident(incidentId);
         if("INVESTIGATING".equals(i.status())) throw ApiProblem.conflict("Wait for the investigation before verifying recovery.");
         World w=world(); var result=Simulation.recovery(w);
         db.update("update incident set status=? where id=?",result.success()?"RESOLVED":"OPEN",incidentId);
@@ -196,7 +211,83 @@ public class IncidentStore {
     }
     @Transactional
     public void recoverInterrupted() {
+        for(String operationId:db.query("select id from operation where status='ACTIVE'",(rs,n)->rs.getString(1)))
+            stopOperation(operationId,"STOPPED","Application restarted; automatic work will not resume without a new operator request.");
         var ids=db.query("select id from investigation where status in ('RUNNING','QUEUED')",(rs,n)->rs.getString(1));
         for(String id:ids) fail(id,"The application stopped during this investigation. Retry to capture a fresh snapshot.",null,List.of());
+    }
+
+    public static final Set<String> REPAIR_ACTIONS=Set.of("START_CHECKOUT_A","START_CHECKOUT_B","START_DATABASE","RESTORE_DB_LINK","ROLLBACK_CHECKOUT","START_CACHE","RESTORE_CACHE_HIT_RATE");
+    private void idle(String incidentId) {
+        if(db.queryForObject("select count(*) from operation where incident_id=? and status='ACTIVE'",Integer.class,incidentId)>0)
+            throw ApiProblem.conflict("An operation is active. Stop it before starting manual work.");
+    }
+    public List<Operation> operations(String incidentId) {
+        return db.query("select * from operation where incident_id=? order by created_at desc",(rs,n)->new Operation(rs.getString("id"),incidentId,rs.getString("created_at"),rs.getString("mode"),List.of(decode(rs.getString("allowed_actions_json"),String[].class)),rs.getInt("max_repairs"),rs.getInt("repairs"),rs.getString("status"),rs.getString("current_run_id"),rs.getInt("expected_revision"),rs.getString("message")),incidentId);
+    }
+    public Operation operation(String id) {
+        String incidentId=db.query("select incident_id from operation where id=?",(rs,n)->rs.getString(1),id).stream().findFirst().orElseThrow(ApiProblem::missing);
+        return operations(incidentId).stream().filter(o->o.id().equals(id)).findFirst().orElseThrow(ApiProblem::missing);
+    }
+    @Transactional
+    public Operation startOperation(String incidentId,InvestigationOptions input) {
+        String mode=input==null?"RECOMMEND":input.mode();
+        if(mode==null || !Set.of("OBSERVE","RECOMMEND","AUTO").contains(mode)) throw ApiProblem.bad("Choose OBSERVE, RECOMMEND or AUTO mode.");
+        List<String> allowed=input==null||input.allowedActions()==null?List.of():input.allowedActions();
+        int limit=input==null||input.maxRepairs()==null?2:input.maxRepairs();
+        if(limit<1||limit>3||allowed.stream().anyMatch(a->a==null||!REPAIR_ACTIONS.contains(a))||new HashSet<>(allowed).size()!=allowed.size()) throw ApiProblem.bad("Choose unique supported repairs and a limit from 1 to 3.");
+        if(!mode.equals("AUTO")) allowed=List.of();
+        lockWorld();lockIncident(incidentId);idle(incidentId);
+        Run r=beginInternal(incidentId);String id=id();
+        db.update("insert into operation(id,incident_id,created_at,mode,allowed_actions_json,max_repairs,status,current_run_id,expected_revision,message) values (?,?,?,?,?,?,'ACTIVE',?,?,?)",id,incidentId,now(),mode,encode(allowed),limit,r.id(),r.snapshot().revision(),"Investigating the saved environment snapshot.");
+        db.update("update investigation set operation_id=? where id=?",id,r.id());
+        activity(incidentId,"POLICY","Started "+mode+" operation; permitted repairs: "+allowed+"; repair limit "+limit+".",r.snapshot().revision());return operation(id);
+    }
+    @Transactional
+    public void correction(String runId,Correction correction) {
+        Run r=run(runId);lockIncident(r.incidentId());
+        if(db.update("update investigation set correction_json=? where id=? and status='RUNNING'",encode(correction),runId)==1)
+            activity(r.incidentId(),"REPORT_CORRECTION","Report correction "+correction.status().toLowerCase()+": "+correction.reason(),r.snapshot().revision());
+    }
+    private void finishOperation(Operation o,String status,String message) {
+        db.update("update operation set status=?,message=? where id=? and status='ACTIVE'",status,message,o.id());
+        activity(o.incidentId(),"OPERATION",message,world().revision());
+    }
+    @Transactional
+    public void stopOperation(String id,String status,String message) {
+        Operation o=operation(id);lockWorld();lockIncident(o.incidentId());o=operation(id);
+        if(!o.status().equals("ACTIVE")) return;
+        fail(o.currentRunId(),message,null,List.of());
+        finishOperation(o,status,message);
+    }
+    @Transactional
+    public void stop(String incidentId,String operationId) {
+        if(!operation(operationId).incidentId().equals(incidentId)) throw ApiProblem.bad("Operation belongs to another incident.");
+        stopOperation(operationId,"STOPPED","Stopped by operator. No further automatic repairs will run.");
+    }
+    /** One atomic decision/repair/verification/next-snapshot transition, fenced by the world lock. */
+    @Transactional
+    public String advanceOperation(String operationId) {
+        Operation o=operation(operationId);lockWorld();lockIncident(o.incidentId());o=operation(operationId);
+        if(!o.status().equals("ACTIVE")) return null;
+        Run r=run(o.currentRunId());
+        if(r.status().equals("FAILED")) {finishOperation(o,"FAILED","Investigation failed; no automatic repair was authorized.");return null;}
+        if(!r.status().equals("COMPLETE")) return null;
+        if(!o.mode().equals("AUTO")) {finishOperation(o,"COMPLETED",o.mode().equals("OBSERVE")?"Observation complete. No repairs authorized.":"Recommendations ready for operator review.");return null;}
+        if(world().revision()!=o.expectedRevision()) {finishOperation(o,"STALE","Environment changed outside this operation. Start a fresh operation to reassess.");return null;}
+        if(Simulation.recovery(world()).success()) {verifyInternal(o.incidentId());finishOperation(o,"RESOLVED","Recovery verified; no repair was needed.");return null;}
+        if(o.repairs()>=o.maxRepairs()) {finishOperation(o,"LIMIT_REACHED","Repair limit reached. Operator review is required.");return null;}
+        // Policy order is explicit and deterministic; recommendations never expand permissions.
+        String action=null;
+        for(String permitted:o.allowedActions()) if(r.report().recommendations().stream().anyMatch(rec->rec.actionId().equals(permitted))) {action=permitted;break;}
+        if(action==null) {finishOperation(o,r.report().recommendations().isEmpty()?"NO_REPAIR":"POLICY_BLOCKED","No recommended repair is permitted by this operation. Operator review is required.");return null;}
+        repairInternal(o.incidentId(),new RepairRequest(r.id(),action));
+        db.update("update operation set repairs=repairs+1,expected_revision=? where id=?",world().revision(),o.id());
+        if(verifyInternal(o.incidentId()).success()) {finishOperation(o,"RESOLVED","Automatic repair completed and recovery verified.");return null;}
+        if(o.repairs()+1>=o.maxRepairs()) {finishOperation(o,"LIMIT_REACHED","Recovery still fails and the repair limit was reached. Operator review is required.");return null;}
+        Run next=beginInternal(o.incidentId());
+        db.update("update investigation set operation_id=? where id=?",o.id(),next.id());
+        db.update("update operation set current_run_id=?,message=? where id=?",next.id(),"Verification failed; investigating a fresh snapshot.",o.id());
+        activity(o.incidentId(),"ADAPTATION","Recovery still fails. Reinvestigating revision "+next.snapshot().revision()+" before another repair.",next.snapshot().revision());return next.id();
     }
 }

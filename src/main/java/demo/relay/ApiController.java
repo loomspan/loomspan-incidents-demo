@@ -17,7 +17,8 @@ public class ApiController {
     @PostMapping("/checkout") public TransactionResult checkout() { return Simulation.checkout(store.world()); }
     @PostMapping("/incidents") public Incident create(@RequestBody NewIncident i) { return store.create(i); }
     @GetMapping("/incidents/{id}") public Detail detail(@PathVariable String id) { return store.detail(id); }
-    @PostMapping("/incidents/{id}/investigate") public Run investigate(@PathVariable String id) { return investigations.start(id); }
+    @PostMapping("/incidents/{id}/investigate") public Run investigate(@PathVariable String id,@RequestBody(required=false) InvestigationOptions options) { return investigations.start(id,options); }
+    @PostMapping("/incidents/{id}/operations/{operationId}/stop") public Detail stop(@PathVariable String id,@PathVariable String operationId) { store.stop(id,operationId);return store.detail(id); }
     @PostMapping("/incidents/{id}/repair") public World repair(@PathVariable String id,@RequestBody RepairRequest r) { return store.repair(id,r); }
     @PostMapping("/incidents/{id}/verify") public RecoveryResult verify(@PathVariable String id) { return store.verify(id); }
 }

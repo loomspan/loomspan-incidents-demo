@@ -23,29 +23,68 @@ public class InvestigationService {
     public InvestigationService(IncidentStore store,SkillTemplate skills,ObjectMapper json) { this.store=store;this.skills=skills;this.json=json; }
     @EventListener(ApplicationReadyEvent.class) public void recover() { store.recoverInterrupted(); }
     @PreDestroy public void close() { executor.shutdownNow(); }
-    public Run start(String incidentId) {
-        Run run=store.begin(incidentId);
-        try { executor.execute(()->execute(run.id())); }
-        catch(RejectedExecutionException e) { store.fail(run.id(),"Investigation queue is full. Retry shortly.",null,List.of()); }
-        return store.run(run.id());
+    public Run start(String incidentId) { return start(incidentId,null); }
+    public Run start(String incidentId,InvestigationOptions options) {
+        Operation op=store.startOperation(incidentId,options);
+        try { executor.execute(()->executeOperation(op.id())); }
+        catch(RejectedExecutionException e) { store.stopOperation(op.id(),"FAILED","Investigation queue is full. Retry shortly."); }
+        return store.run(op.currentRunId());
+    }
+    void executeOperation(String operationId) {
+        try {
+            Operation op=store.operation(operationId);
+            String runId=op.currentRunId();
+            while(runId!=null && store.operation(operationId).status().equals("ACTIVE")) {
+                execute(runId);
+                runId=store.advanceOperation(operationId);
+            }
+        } catch(RuntimeException e) {
+            log.warn("Operation {} stopped ({})",operationId,e.getClass().getSimpleName());
+            store.stopOperation(operationId,"FAILED","Operation stopped after an execution error. Review evidence before retrying.");
+        }
+    }
+    private Report checked(String value,String runId) {
+        Report report=json.readValue(value,Report.class);
+        IncidentStore.validate(report,store.receipts(runId));return report;
+    }
+    static List<ExecutionEvent> events(ai.loomspan.api.SkillExecutionView view) {
+        return view.events().stream().filter(e->Set.of("SKILL_STARTED","SKILL_FINISHED").contains(e.type()))
+            .map(e->new ExecutionEvent(e.timestamp().toString(),e.type(),e.frameId(),e.route())).toList();
     }
     void execute(String runId) {
         if(!store.markRunning(runId)) return;
         var session=new AtomicReference<String>();
-        var events=new AtomicReference<List<ExecutionEvent>>(List.of());
+        var observed=new AtomicReference<List<ExecutionEvent>>(List.of());
         try {
             Run run=store.run(runId);
-            // The model receives symptoms and an opaque snapshot handle, never fault switches or preset names.
             String result=skills.invoke("investigateIncident",Map.of("runId",runId,"ticket",store.incident(run.incidentId()).title(),"symptom",Simulation.symptom(run.snapshot())),view->{
-                session.set(view.sessionId());
-                events.set(view.events().stream().filter(e->Set.of("SKILL_STARTED","SKILL_FINISHED").contains(e.type()))
-                    .map(e->new ExecutionEvent(e.timestamp().toString(),e.type(),e.frameId(),e.route())).toList());
+                session.set(view.sessionId());observed.set(events(view));
             });
-            store.complete(runId,json.readValue(result,Report.class),session.get(),events.get());
+            if(!store.run(runId).status().equals("RUNNING")) return;
+            Report report;
+            try { report=checked(result,runId); }
+            catch(RuntimeException invalid) {
+                // Exactly one application-level correction, using saved evidence and no tools.
+                String reason=invalid instanceof ApiProblem?invalid.getMessage():"Report JSON did not match the required contract.";
+                var correctionSession=new AtomicReference<String>();
+                var correctionEvents=new AtomicReference<List<ExecutionEvent>>(List.of());
+                store.correction(runId,new Correction("STARTED",reason,null,List.of()));
+                try {
+                    String corrected=skills.invoke("correctIncidentReport",Map.of("candidate",result,"receipts",json.writeValueAsString(store.receipts(runId)),"validationError",reason),view->{
+                        correctionSession.set(view.sessionId());correctionEvents.set(events(view));
+                    });
+                    report=checked(corrected,runId);
+                    store.correction(runId,new Correction("ACCEPTED",reason,correctionSession.get(),correctionEvents.get()));
+                } catch(RuntimeException rejected) {
+                    store.correction(runId,new Correction("REJECTED",reason,correctionSession.get(),correctionEvents.get()));
+                    throw rejected;
+                }
+            }
+            store.complete(runId,report,session.get(),observed.get());
         } catch(RuntimeException e) {
             log.warn("Investigation {} failed ({}){}",runId,e.getClass().getSimpleName(),e instanceof ApiProblem?": "+e.getMessage():"");
             log.debug("Investigation failure",e);
-            store.fail(runId,"Investigation could not produce a validated report. Check model configuration or Console diagnostics, then retry.",session.get(),events.get());
+            store.fail(runId,"Investigation could not produce a validated report. Any permitted correction attempt is exhausted; review evidence before retrying.",session.get(),observed.get());
         }
     }
 }
