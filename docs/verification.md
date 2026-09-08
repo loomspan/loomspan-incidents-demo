@@ -1,5 +1,36 @@
 # Verification record
 
+## Capacity slice — September 7, 2026
+
+The capacity build passed 19 deterministic tests and three opt-in live-model
+tests using the same `gpt-4.1` connection and framework revision listed below.
+`mvnw.cmd package` passed the deterministic suite, TypeScript check, Vite build
+and JAR packaging; the three provider tests were run separately with
+`-Drelay.live=true -Dtest=LiveInvestigationTest` and all passed.
+
+New checks include 128 two-instance/fault/load combinations, exact capacity
+boundaries, rejecting resolution when only customer checks pass, preserving
+demand and independent faults during a restart, stale proposals after traffic
+changes, no supported repair for full-pool overload, and a populated V1 → V2
+migration that preserves the original snapshot JSON.
+
+The existing local file database was backed up before upgrading. Its previous
+incident, report, receipts, activity and execution events were compared before
+and after the upgrade and preserved. The environment revision advanced once,
+and historical snapshots retained single-instance semantics.
+
+The packaged UI was exercised through **Lost redundancy → Open incident →
+Verify recovery → Peak traffic → Investigate → Start checkout B → Verify**.
+Verification correctly kept the risk incident open while customer requests
+passed. Peak demand produced 100 successful and 50 failed requests/s. The
+application and capacity specialists recommended checkout B's specific restart.
+The repair preserved 150 requests/s of demand, restored 200 requests/s of online
+capacity, and passed both recovery checks. The two resolved incidents remain in
+the presenter's database. The capacity dashboard was visually inspected at the
+desktop browser size; mobile device testing was not performed.
+
+## Original slice baseline
+
 Verified locally on September 7, 2026 with Java 21.0.2, the configured OpenAI
 connection using `gpt-4.1`, and Loomspan framework commit
 `fbd9db5926f890fe6df658e5676c3dda8e64ce34` (`1.0.0-beta.2-SNAPSHOT`).

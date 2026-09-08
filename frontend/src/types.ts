@@ -4,6 +4,25 @@ export type World = {
   databaseRunning: boolean;
   linkAllowed: boolean;
   badDeploy: boolean;
+  checkoutBRunning: boolean | null;
+  demandRps: number;
+};
+export type Capacity = {
+  demandRps: number;
+  onlineInstances: number;
+  targetInstances: number;
+  capacityRps: number;
+  successfulRps: number;
+  failedRps: number;
+  status: "HEALTHY" | "AT_RISK" | "DEGRADED" | "OUTAGE";
+  redundancyRestored: boolean;
+};
+export type Recovery = {
+  success: boolean;
+  customerHealthy: boolean;
+  redundancyRestored: boolean;
+  message: string;
+  revision: number;
 };
 export type Check = {
   success: boolean;
@@ -65,6 +84,7 @@ export type Detail = { incident: Incident; runs: Run[]; activity: Activity[] };
 export type State = {
   environment: World;
   checkout: Check;
+  capacity: Capacity;
   incidents: Incident[];
   activity: Activity[];
 };

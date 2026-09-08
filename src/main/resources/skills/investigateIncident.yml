@@ -1,15 +1,17 @@
 name: investigateIncident
-description: Coordinate selective application, network and database specialists to diagnose a checkout incident and propose evidence-supported repairs.
+description: Coordinate selective application, capacity, network and database specialists to distinguish outages, saturation and redundancy risks and propose evidence-supported repairs.
 model: investigator
 planning_mode: true
 concurrency: true
-max_steps: 6
+max_steps: 7
 allowed_skills:
   - name: investigateApplication
     max_tasks: 1
   - name: investigateNetwork
     max_tasks: 1
   - name: investigateDatabase
+    max_tasks: 1
+  - name: investigateCapacity
     max_tasks: 1
   - name: readInvestigationEvidence
     min_tasks: 1
@@ -18,10 +20,17 @@ prompt: |
   You are Relay's incident commander. Diagnose the customer symptom from real probe receipts.
   The environment is simulated but its state is not supplied to you. Never guess fault switches.
   Forward the exact runId and the ticket plus symptom as context to each selected specialist.
-  Select specialists according to the current symptom: a 500 with validation errors or a 503
-  calls for application investigation; a database timeout calls for application, network and
+  Select specialists according to the CURRENT symptom rather than stale ticket text:
+  a 500 with validation errors calls for application investigation; a database timeout calls for application, network and
   database investigation to distinguish unhealthy dependencies from blocked paths.
-  A healthy customer check can be assessed by the application specialist alone.
+  Gateway capacity exceeded, no online instance, or a redundancy/availability alert calls for
+  BOTH application and capacity specialists. They independently distinguish healthy code from
+  too little capacity. Customer requests may succeed while redundancy is lost: explicitly report
+  that availability risk rather than inventing a customer outage. Verification requires both
+  successful customer checkout and the configured instance availability target.
+  A healthy customer check with NO availability alert can use the application specialist alone.
+  If traffic exceeds full configured capacity and all instances are online, no supported repair
+  exists. Explain the capacity shortfall and escalation; do not invent scale-out or traffic reduction.
   Independent specialists read the same immutable snapshot and may share a parallelGroup.
   Their findings have no dependencies on one another. Do not call every specialist by default.
   AFTER every selected specialist completes, call readInvestigationEvidence with runId.
@@ -51,10 +60,10 @@ output_schema:
   properties:
     summary:
       type: string
-      evidence: (investigateApplication or investigateNetwork or investigateDatabase) and readInvestigationEvidence
+      evidence: (investigateApplication or investigateCapacity or investigateNetwork or investigateDatabase) and readInvestigationEvidence
     likelyCause:
       type: string
-      evidence: (investigateApplication or investigateNetwork or investigateDatabase) and readInvestigationEvidence
+      evidence: (investigateApplication or investigateCapacity or investigateNetwork or investigateDatabase) and readInvestigationEvidence
     confidence:
       type: string
       enum: [low, medium, high]
@@ -68,7 +77,7 @@ output_schema:
         properties:
           actionId:
             type: string
-            enum: [START_CHECKOUT, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT]
+            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT]
           evidenceId: { type: string }
           reason: { type: string }
         required: [actionId, evidenceId, reason]

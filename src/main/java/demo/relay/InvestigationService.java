@@ -36,7 +36,7 @@ public class InvestigationService {
         try {
             Run run=store.run(runId);
             // The model receives symptoms and an opaque snapshot handle, never fault switches or preset names.
-            String result=skills.invoke("investigateIncident",Map.of("runId",runId,"ticket",store.incident(run.incidentId()).title(),"symptom",Simulation.checkout(run.snapshot()).message()),view->{
+            String result=skills.invoke("investigateIncident",Map.of("runId",runId,"ticket",store.incident(run.incidentId()).title(),"symptom",Simulation.symptom(run.snapshot())),view->{
                 session.set(view.sessionId());
                 events.set(view.events().stream().filter(e->Set.of("SKILL_STARTED","SKILL_FINISHED").contains(e.type()))
                     .map(e->new ExecutionEvent(e.timestamp().toString(),e.type(),e.frameId(),e.route())).toList());

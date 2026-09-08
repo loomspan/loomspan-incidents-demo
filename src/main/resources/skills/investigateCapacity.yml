@@ -1,0 +1,51 @@
+name: investigateCapacity
+description: Interpret online instances, demand and pool capacity. Distinguish lost redundancy with successful checkout from saturation or total loss of capacity. Propose only the stopped-instance starts offered by the probe. Never treat lowering simulated traffic as a repair, and never invent extra instances.
+model: investigator
+allowed_skills:
+  - name: inspectCapacity
+prompt: |
+  Interpret online instances, demand and pool capacity. Distinguish lost redundancy with successful checkout from saturation or total loss of capacity. Propose only the stopped-instance starts offered by the probe. Never treat lowering simulated traffic as a repair, and never invent extra instances.
+  Call inspectCapacity with the exact runId. Never invent a receipt or observation.
+  Return a concise summary and copy every field of the returned receipt into receipts.
+  Preserve the receipt ID and supported action IDs exactly, including healthy observations
+  with empty actions. Do not treat a suggested repair as executed or claim recovery.
+input_schema:
+  type: object
+  properties:
+    runId: { type: string }
+    context: { type: string }
+  required: [runId, context]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      evidence: inspectCapacity
+    receipts:
+      type: array
+      evidence: inspectCapacity
+      items:
+        type: object
+        properties:
+          id: { type: string }
+          runId: { type: string }
+          revision: { type: integer }
+          observedAt: { type: string }
+          probe: { type: string }
+          observation: { type: string }
+          actions:
+            type: array
+            items:
+              type: object
+              properties:
+                id: { type: string }
+                label: { type: string }
+                effect: { type: string }
+              required: [id, label, effect]
+              additionalProperties: false
+        required: [id, runId, revision, observedAt, probe, observation, actions]
+        additionalProperties: false
+  required: [summary, receipts]
+  additionalProperties: false
+output_schema_max_retries: 2

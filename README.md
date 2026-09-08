@@ -5,6 +5,11 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
+**Current slice:** two independently controlled checkout instances, variable
+incoming demand, a capacity specialist, and recovery checks that distinguish
+customer availability from lost redundancy. Existing incident records upgrade
+in place and retain their original evidence.
+
 ## Run
 
 Requires Java 21+, Node.js 22.13+ for building, and model access. The app consumes
@@ -68,11 +73,34 @@ opaque run ID, ticket and customer symptom, not the preset name or fault switche
 Model wording and chosen plans may vary; receipts, action validation and checkout
 outcomes are deterministic.
 
+## Capacity walkthrough: risk becomes impact
+
+1. Choose **Lost redundancy**, then open an incident. Checkout A handles all
+   60 requests/s; B is stopped. Customer checkout passes but **Redundancy lost**
+   is shown separately. This is an availability risk, not a customer outage.
+2. Investigate. The commander coordinates application and capacity specialists
+   and can recommend **Start checkout B**. Try **Verify recovery** before repairing:
+   the successful customer check alone cannot resolve an unmet availability target.
+3. Change **Incoming traffic** to **Peak · 150 req/s**. One instance can handle
+   only 100 requests/s, so 50 requests/s now fail. Any earlier proposal is stale.
+4. Reinvestigate the current symptom, apply **Start checkout B**, then verify.
+   Traffic stays at 150 requests/s, both instances are online, and all requests succeed.
+5. For an infeasible case, use **Restore healthy**, choose **Beyond pool capacity ·
+   240 req/s**, and open another incident. All 200 requests/s of available capacity
+   are used and 40 requests/s fail. There is no supported scale-out or traffic
+   reduction repair; the investigation should explain the shortfall and escalate.
+
+**Overloaded instance** presets step 3 directly. A broken deployment and the
+database connection are shared by both instances; adding a healthy process cannot
+repair broken code or a blocked dependency. See [capacity rules](docs/capacity-slice.md).
+
 ## Simulation and skill boundaries
 
-`Simulation.java` defines four independently composable conditions: checkout
-power, database power, network permission, and deployment health. The gateway is
-always available in this first slice. A bad deployment fails before the checkout
+`Simulation.java` defines independently composable checkout A/B power, incoming
+demand, database power, network permission, and shared deployment health. The
+gateway is always available and distributes requests to online instances. Each
+supports 100 requests/s; excess requests receive simulated gateway 503 responses.
+A bad deployment fails before the checkout
 code reaches the database, so fixing it can reveal a second failure. Database
 health is checked locally; network health is checked from the application path.
 
@@ -81,6 +109,7 @@ investigateIncident (YAML planner)
   ├─ investigateApplication (focused YAML specialist) → inspectApplication (Java)
   ├─ investigateNetwork     (focused YAML specialist) → inspectNetwork     (Java)
   ├─ investigateDatabase    (focused YAML specialist) → inspectDatabase    (Java)
+  ├─ investigateCapacity    (focused YAML specialist) → inspectCapacity    (Java)
   └─ readInvestigationEvidence (Java; after the selected specialists finish)
 ```
 
@@ -95,7 +124,8 @@ offered by its cited receipt. These checks do not prove model prose is correct.
 The model cannot mutate the environment. Repair buttons use deterministic
 application services with exact action IDs, current-revision checks, latest-run
 checks, and idempotency. One repair is applied before verification/reassessment.
-Recovery is a deterministic fresh customer transaction, not an LLM assertion.
+Recovery requires both a successful fresh customer batch and the instance
+availability target, not an LLM assertion.
 
 ## Persistence and lifecycle
 
@@ -103,6 +133,10 @@ The default database is `data/relay.mv.db`. Flyway initializes it once. Ordinary
 restarts never reset records. **Restore healthy** resets only the simulated
 component state, increments its revision, and preserves all incident history.
 For a separate clean demo, set `RELAY_DATABASE_URL` to a new file database path.
+V2 commissions checkout B online at 60 requests/s and increments the environment
+revision, invalidating old repair proposals. Existing A/database/network/deployment
+conditions and all incident records remain intact. Historical snapshots without
+B retain their original single-instance semantics; their JSON is not rewritten.
 
 Each investigation saves a snapshot before queueing. Changes during investigation
 do not alter its evidence; the resulting assessment is marked historical in the
@@ -131,7 +165,9 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 .\mvnw.cmd package
 ```
 
-Tests cover all 16 fault combinations, blocked-path evidence, compound recovery,
+Tests cover all 16 original fault combinations plus 128 two-instance/load cases,
+an actual V1 → V2 migration, redundancy versus outage, demand boundaries, capacity
+repair and no-remedy scenarios, blocked-path evidence, compound recovery,
 immutable snapshots, stale repair rejection, unsupported and cross-run receipts,
 concurrent duplicate repairs, interrupted runs, public Java skill invocation,
 and HTTP persistence/error contracts. See [design notes](docs/design.md) and the

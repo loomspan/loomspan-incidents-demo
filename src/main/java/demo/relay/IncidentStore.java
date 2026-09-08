@@ -22,11 +22,11 @@ public class IncidentStore {
         if(db.query("select id from incident where id=? for update",(rs,n)->rs.getString(1),id).isEmpty()) throw ApiProblem.missing();
     }
     public World world() {
-        return db.queryForObject("select * from environment where id=1",(rs,n)->new World(rs.getInt("revision"),rs.getBoolean("checkout_running"),rs.getBoolean("database_running"),rs.getBoolean("link_allowed"),rs.getBoolean("bad_deploy")));
+        return db.queryForObject("select * from environment where id=1",(rs,n)->new World(rs.getInt("revision"),rs.getBoolean("checkout_running"),rs.getBoolean("database_running"),rs.getBoolean("link_allowed"),rs.getBoolean("bad_deploy"),rs.getBoolean("checkout_b_running"),rs.getInt("demand_rps")));
     }
     private void saveWorld(World w) {
-        db.update("update environment set revision=?,checkout_running=?,database_running=?,link_allowed=?,bad_deploy=? where id=1",
-            w.revision(),w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy());
+        db.update("update environment set revision=?,checkout_running=?,database_running=?,link_allowed=?,bad_deploy=?,checkout_b_running=?,demand_rps=? where id=1",
+            w.revision(),w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps());
     }
     private void expected(World w,int revision) {
         if(w.revision()!=revision) throw ApiProblem.conflict("The environment changed. Refresh and investigate its current state before applying this action.");
@@ -39,10 +39,11 @@ public class IncidentStore {
         if(c.enabled()==null || c.expectedRevision()==null) throw ApiProblem.bad("Control value and expectedRevision are required.");
         lockWorld(); World w=world(); expected(w,c.expectedRevision());
         World next=switch(c.control()==null?"":c.control()) {
-            case "checkout" -> new World(w.revision()+1,c.enabled(),w.databaseRunning(),w.linkAllowed(),w.badDeploy());
-            case "database" -> new World(w.revision()+1,w.checkoutRunning(),c.enabled(),w.linkAllowed(),w.badDeploy());
-            case "link" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),c.enabled(),w.badDeploy());
-            case "deployment" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),c.enabled());
+            case "checkout" -> new World(w.revision()+1,c.enabled(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps());
+            case "checkoutB" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),c.enabled(),w.demandRps());
+            case "database" -> new World(w.revision()+1,w.checkoutRunning(),c.enabled(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps());
+            case "link" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),c.enabled(),w.badDeploy(),w.checkoutBRunning(),w.demandRps());
+            case "deployment" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),c.enabled(),w.checkoutBRunning(),w.demandRps());
             default -> throw ApiProblem.bad("Unknown environment control.");
         };
         saveWorld(next); activity(null,"CONTROL",c.control()+" changed to "+(c.enabled()?"enabled":"disabled"),next.revision()); return next;
@@ -52,13 +53,23 @@ public class IncidentStore {
         if(p.expectedRevision()==null) throw ApiProblem.bad("expectedRevision is required.");
         lockWorld(); World w=world(); expected(w,p.expectedRevision());
         World next=switch(p.name()==null?"":p.name()) {
-            case "healthy" -> new World(w.revision()+1,true,true,true,false);
-            case "connection" -> new World(w.revision()+1,true,true,false,false);
-            case "deployment" -> new World(w.revision()+1,true,true,true,true);
-            case "compound" -> new World(w.revision()+1,true,true,false,true);
+            case "healthy" -> new World(w.revision()+1,true,true,true,false,true,60);
+            case "connection" -> new World(w.revision()+1,true,true,false,false,true,60);
+            case "deployment" -> new World(w.revision()+1,true,true,true,true,true,60);
+            case "compound" -> new World(w.revision()+1,true,true,false,true,true,60);
+            case "redundancy" -> new World(w.revision()+1,true,true,true,false,false,60);
+            case "overload" -> new World(w.revision()+1,true,true,true,false,false,150);
             default -> throw ApiProblem.bad("Unknown preset.");
         };
         saveWorld(next); activity(null,"PRESET","Applied environment preset: "+p.name(),next.revision()); return next;
+    }
+    @Transactional
+    public World traffic(Traffic t) {
+        if(t.demandRps()==null || t.demandRps()<1 || t.demandRps()>400 || t.expectedRevision()==null)
+            throw ApiProblem.bad("Traffic must be between 1 and 400 requests/s and expectedRevision is required.");
+        lockWorld(); World w=world(); expected(w,t.expectedRevision());
+        World next=new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),t.demandRps());
+        saveWorld(next);activity(null,"TRAFFIC","Incoming checkout demand set to "+t.demandRps()+" requests/s.",next.revision());return next;
     }
     public List<Incident> incidents() {
         return db.query("select * from incident order by created_at desc limit 100",(rs,n)->new Incident(rs.getString("id"),rs.getString("title"),rs.getString("status"),rs.getString("created_at"),rs.getString("last_run_id")));
@@ -70,10 +81,10 @@ public class IncidentStore {
     @Transactional
     public Incident create(NewIncident input) {
         lockWorld(); World w=world(); var check=Simulation.checkout(w);
-        String title=input.title()==null||input.title().isBlank()?check.message():input.title().trim();
+        String title=input.title()==null||input.title().isBlank()?Simulation.symptom(w):input.title().trim();
         if(title.length()>300) throw ApiProblem.bad("Use a title of at most 300 characters.");
         String id=id(); db.update("insert into incident values (?,?, 'OPEN',?,null)",id,title,now());
-        activity(id,"OPENED","Incident opened. Customer check: "+check.message(),w.revision()); return incident(id);
+        activity(id,"OPENED","Incident opened. "+Simulation.symptom(w),w.revision()); return incident(id);
     }
     public List<Receipt> receipts(String runId) {
         return db.query("select receipt_json from evidence where run_id=? order by created_at,id",(rs,n)->decode(rs.getString(1),Receipt.class),runId);
@@ -92,7 +103,7 @@ public class IncidentStore {
         var runs=db.query("select id from investigation where incident_id=? order by created_at desc",(rs,n)->run(rs.getString(1)),id);
         return new Detail(i,runs,activities(id));
     }
-    public State state() { World w=world(); return new State(w,Simulation.checkout(w),incidents(),activities(null)); }
+    public State state() { World w=world(); return new State(w,Simulation.checkout(w),Simulation.capacity(w),incidents(),activities(null)); }
     @Transactional
     public Run begin(String incidentId) {
         lockWorld(); lockIncident(incidentId); Incident i=incident(incidentId);
@@ -163,10 +174,10 @@ public class IncidentStore {
         activity(incidentId,"REPAIR",action.label()+" applied. Recovery verification is still required.",next.revision()); return next;
     }
     @Transactional
-    public TransactionResult verify(String incidentId) {
+    public RecoveryResult verify(String incidentId) {
         lockWorld(); lockIncident(incidentId); Incident i=incident(incidentId);
         if("INVESTIGATING".equals(i.status())) throw ApiProblem.conflict("Wait for the investigation before verifying recovery.");
-        World w=world(); var result=Simulation.checkout(w);
+        World w=world(); var result=Simulation.recovery(w);
         db.update("update incident set status=? where id=?",result.success()?"RESOLVED":"OPEN",incidentId);
         activity(incidentId,"VERIFICATION",(result.success()?"Recovery verified. ":"Recovery failed; further investigation needed. ")+result.message(),w.revision()); return result;
     }

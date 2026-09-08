@@ -11,6 +11,8 @@ public class ProbeSkills {
     public ProbeSkills(IncidentStore store) { this.store=store; }
     @SkillMethod(description="Read checkout liveness, deployment history, errors and logs. Returns an immutable evidence receipt and any supported repairs.")
     public Receipt inspectApplication(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) { return store.probe(runId,"inspectApplication"); }
+    @SkillMethod(description="Measure checkout instance availability, gateway traffic and capacity. Distinguish lost redundancy from saturation and offer exact per-instance starts for stopped instances.")
+    public Receipt inspectCapacity(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) { return store.probe(runId,"inspectCapacity"); }
     @SkillMethod(description="Check DNS, checkout to database connectivity and firewall counters. Returns an immutable evidence receipt and any supported repairs.")
     public Receipt inspectNetwork(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) { return store.probe(runId,"inspectNetwork"); }
     @SkillMethod(description="Check database process, local readiness and connection capacity. Returns an immutable evidence receipt and any supported repairs.")

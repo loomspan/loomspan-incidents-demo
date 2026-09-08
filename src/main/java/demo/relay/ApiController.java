@@ -12,10 +12,11 @@ public class ApiController {
     @GetMapping("/state") public State state() { return store.state(); }
     @PostMapping("/environment/control") public World control(@RequestBody Control c) { return store.control(c); }
     @PostMapping("/environment/preset") public World preset(@RequestBody Preset p) { return store.preset(p); }
+    @PostMapping("/environment/traffic") public World traffic(@RequestBody Traffic t) { return store.traffic(t); }
     @PostMapping("/checkout") public TransactionResult checkout() { return Simulation.checkout(store.world()); }
     @PostMapping("/incidents") public Incident create(@RequestBody NewIncident i) { return store.create(i); }
     @GetMapping("/incidents/{id}") public Detail detail(@PathVariable String id) { return store.detail(id); }
     @PostMapping("/incidents/{id}/investigate") public Run investigate(@PathVariable String id) { return investigations.start(id); }
     @PostMapping("/incidents/{id}/repair") public World repair(@PathVariable String id,@RequestBody RepairRequest r) { return store.repair(id,r); }
-    @PostMapping("/incidents/{id}/verify") public TransactionResult verify(@PathVariable String id) { return store.verify(id); }
+    @PostMapping("/incidents/{id}/verify") public RecoveryResult verify(@PathVariable String id) { return store.verify(id); }
 }

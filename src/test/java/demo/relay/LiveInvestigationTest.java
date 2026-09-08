@@ -22,7 +22,7 @@ class LiveInvestigationTest {
     private Run investigate(String incidentId) {
         Run r=store.begin(incidentId);store.markRunning(r.id());
         var views=new ArrayList<ai.loomspan.api.SkillExecutionView>();
-        String result=skills.invoke("investigateIncident",Map.of("runId",r.id(),"ticket",store.incident(incidentId).title(),"symptom",Simulation.checkout(r.snapshot()).message()),views::add);
+        String result=skills.invoke("investigateIncident",Map.of("runId",r.id(),"ticket",store.incident(incidentId).title(),"symptom",Simulation.symptom(r.snapshot())),views::add);
         var view=views.getFirst();
         try {
             store.complete(r.id(),json.readValue(result,Report.class),view.sessionId(),view.events().stream().filter(e->Set.of("SKILL_STARTED","SKILL_FINISHED").contains(e.type())).map(e->new ExecutionEvent(e.timestamp().toString(),e.type(),e.frameId(),e.route())).toList());
@@ -45,5 +45,28 @@ class LiveInvestigationTest {
         store.repair(i.id(),new RepairRequest(second.id(),"RESTORE_DB_LINK"));
         assertThat(store.verify(i.id()).success()).isTrue();
         assertThat(store.incident(i.id()).status()).isEqualTo("RESOLVED");
+    }
+    @Test void capacitySpecialistDistinguishesRedundancyRiskFromOverload() {
+        store.preset(new Preset("redundancy",store.world().revision()));
+        Incident i=store.create(new NewIncident(null));Run risk=investigate(i.id());
+        assertThat(store.state().checkout().success()).isTrue();
+        assertThat(risk.evidence()).extracting(Receipt::probe).contains("inspectApplication","inspectCapacity");
+        assertThat(risk.report().recommendations()).extracting(Recommendation::actionId).containsExactly("START_CHECKOUT_B");
+        assertThat((risk.report().summary()+risk.report().likelyCause()).toLowerCase()).contains("redundan");
+        assertThat(store.verify(i.id()).success()).isFalse();
+        store.traffic(new Traffic(150,store.world().revision()));
+        Run overloaded=investigate(i.id());
+        assertThat(overloaded.report().recommendations()).extracting(Recommendation::actionId).containsExactly("START_CHECKOUT_B");
+        assertThat(store.state().capacity().failedRps()).isEqualTo(50);
+        store.repair(i.id(),new RepairRequest(overloaded.id(),"START_CHECKOUT_B"));
+        assertThat(store.world().demandRps()).isEqualTo(150);
+        assertThat(store.verify(i.id()).success()).isTrue();
+    }
+    @Test void fullPoolOverloadProducesNoUnsupportedScaleOutAction() {
+        store.preset(new Preset("healthy",store.world().revision()));store.traffic(new Traffic(240,store.world().revision()));
+        Incident i=store.create(new NewIncident(null));Run r=investigate(i.id());
+        assertThat(r.evidence()).extracting(Receipt::probe).contains("inspectCapacity");
+        assertThat(r.report().recommendations()).isEmpty();
+        assertThat(store.verify(i.id()).success()).isFalse();
     }
 }

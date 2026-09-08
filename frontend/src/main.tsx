@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { State, Detail, Incident, Run, Receipt, Check } from "./types";
+import type {
+  State,
+  Detail,
+  Incident,
+  Run,
+  Receipt,
+  Check,
+  Recovery,
+} from "./types";
 import "./style.css";
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
@@ -31,6 +39,7 @@ const probeName = (s: string) =>
     inspectApplication: "Application probe",
     inspectNetwork: "Network probe",
     inspectDatabase: "Database probe",
+    inspectCapacity: "Capacity probe",
   })[s] || s;
 function Pill({
   good,
@@ -119,6 +128,7 @@ function App() {
     );
   const w = state.environment,
     check = state.checkout,
+    capacity = state.capacity,
     run = detail?.runs[0],
     incident = detail?.incident;
   const running = incident?.status === "INVESTIGATING",
@@ -290,7 +300,7 @@ function App() {
                 <h3>Gateway</h3>
                 <p>store.northstar.local</p>
                 <div className="node-bottom">
-                  <span>Routes customer traffic</span>
+                  <span>Balances online instances</span>
                   <span className="tiny-light" />
                 </div>
               </div>
@@ -300,26 +310,55 @@ function App() {
               </div>
               <div
                 className={
-                  "node " +
-                  (!w.checkoutRunning || w.badDeploy ? "affected" : "")
+                  "node checkout-pool " +
+                  (!capacity.redundancyRestored || w.badDeploy
+                    ? "affected"
+                    : "")
                 }
               >
-                <div className="node-top">
-                  <span className="node-icon">⌘</span>
-                  <Pill good={w.checkoutRunning}>
-                    {w.checkoutRunning ? "Running" : "Stopped"}
+                <div className="pool-heading">
+                  <h3>Checkout pool</h3>
+                  <Pill good={capacity.redundancyRestored}>
+                    {capacity.onlineInstances}/2 online
                   </Pill>
                 </div>
-                <h3>Checkout</h3>
                 <p>
                   checkout-{w.badDeploy ? "2.0 · regression" : "1.9 · stable"}
                 </p>
-                <div className="node-bottom">
-                  <label>Service power</label>
+                <div className="instance-row">
+                  <span
+                    className={
+                      "status-dot " + (w.checkoutRunning ? "green" : "orange")
+                    }
+                  />
+                  <div>
+                    <strong>Checkout A</strong>
+                    <small>
+                      {w.checkoutRunning
+                        ? "100 req/s capacity"
+                        : "Stopped · 0 req/s"}
+                    </small>
+                  </div>
+                  {toggle("checkout", w.checkoutRunning, "Checkout A running")}
+                </div>
+                <div className="instance-row">
+                  <span
+                    className={
+                      "status-dot " + (w.checkoutBRunning ? "green" : "orange")
+                    }
+                  />
+                  <div>
+                    <strong>Checkout B</strong>
+                    <small>
+                      {w.checkoutBRunning
+                        ? "100 req/s capacity"
+                        : "Stopped · 0 req/s"}
+                    </small>
+                  </div>
                   {toggle(
-                    "checkout",
-                    w.checkoutRunning,
-                    "Checkout service running",
+                    "checkoutB",
+                    !!w.checkoutBRunning,
+                    "Checkout B running",
                   )}
                 </div>
               </div>
@@ -344,6 +383,85 @@ function App() {
                     "Database service running",
                   )}
                 </div>
+              </div>
+            </div>
+            <div className="capacity-panel">
+              <div className="capacity-heading">
+                <div>
+                  <strong>Traffic & capacity</strong>
+                  <p>
+                    Each online instance handles 100 requests/s. Availability
+                    target: two online instances.
+                  </p>
+                </div>
+                <Pill good={capacity.status === "HEALTHY"}>
+                  {
+                    {
+                      HEALTHY: "Fully available",
+                      AT_RISK: "Redundancy lost",
+                      DEGRADED: "Partially failing",
+                      OUTAGE: "Customer outage",
+                    }[capacity.status]
+                  }
+                </Pill>
+              </div>
+              <div className="capacity-metrics">
+                <div>
+                  <span>INCOMING DEMAND</span>
+                  <strong>
+                    {capacity.demandRps}
+                    <small> req/s</small>
+                  </strong>
+                </div>
+                <div>
+                  <span>ONLINE CAPACITY</span>
+                  <strong>
+                    {capacity.capacityRps}
+                    <small> req/s</small>
+                  </strong>
+                </div>
+                <div>
+                  <span>SUCCESSFUL</span>
+                  <strong>
+                    {capacity.successfulRps}
+                    <small> req/s</small>
+                  </strong>
+                </div>
+                <div className={capacity.failedRps ? "failed-metric" : ""}>
+                  <span>FAILED</span>
+                  <strong>
+                    {capacity.failedRps}
+                    <small> req/s</small>
+                  </strong>
+                </div>
+              </div>
+              <div className="traffic-control">
+                <label htmlFor="traffic-level">Incoming traffic</label>
+                <select
+                  id="traffic-level"
+                  value={w.demandRps}
+                  disabled={busy}
+                  onChange={(e) =>
+                    void act(() =>
+                      api("/environment/traffic", {
+                        demandRps: Number(e.target.value),
+                        expectedRevision: w.revision,
+                      }),
+                    )
+                  }
+                >
+                  <option value={60}>Normal · 60 req/s</option>
+                  <option value={150}>Peak · 150 req/s</option>
+                  <option value={240}>Beyond pool capacity · 240 req/s</option>
+                  {![60, 150, 240].includes(w.demandRps) && (
+                    <option value={w.demandRps}>
+                      Custom · {w.demandRps} req/s
+                    </option>
+                  )}
+                </select>
+                <span>
+                  Simulated demand; changes do not repair a stopped instance.
+                </span>
               </div>
             </div>
             <div className="environment-controls">
@@ -378,6 +496,8 @@ function App() {
                 ["connection", "Blocked connection"],
                 ["deployment", "Bad deployment"],
                 ["compound", "Two faults"],
+                ["redundancy", "Lost redundancy"],
+                ["overload", "Overloaded instance"],
               ].map(([name, label]) => (
                 <button
                   disabled={busy}
@@ -403,7 +523,7 @@ function App() {
             >
               <span className="check-symbol">{check.success ? "✓" : "!"}</span>
               <div>
-                <strong>Synthetic customer checkout</strong>
+                <strong>Customer checkout batch</strong>
                 <p>{check.message}</p>
               </div>
               <span className="latency">
@@ -497,15 +617,11 @@ function App() {
                         disabled={busy || running || resolved}
                         onClick={() =>
                           void act(async () => {
-                            const r = await api<Check>(
+                            const r = await api<Recovery>(
                               `/incidents/${incident.id}/verify`,
                               {},
                             );
-                            setNotice(
-                              r.success
-                                ? "Recovery verified. Incident resolved."
-                                : "Checkout still fails. Reinvestigate to find what remains.",
-                            );
+                            setNotice(r.message);
                           })
                         }
                       >
@@ -519,8 +635,8 @@ function App() {
                       <div>
                         <strong>Recovery verified</strong>
                         <p>
-                          A fresh customer transaction passed. This incident is
-                          resolved; the current environment can still change
+                          The saved recovery checks passed when this incident
+                          was resolved. The current environment can still change
                           independently.
                         </p>
                       </div>
@@ -531,7 +647,7 @@ function App() {
                       Environment changed from revision {run.snapshot.revision}{" "}
                       to {w.revision}.{" "}
                       {incident.status === "MITIGATED"
-                        ? "Verify the repair, then reinvestigate if checkout still fails."
+                        ? "Verify checkout and instance availability, then reinvestigate if either check fails."
                         : "This assessment is historical. Reinvestigate before applying a repair."}
                     </div>
                   )}

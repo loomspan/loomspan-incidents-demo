@@ -26,7 +26,7 @@ class IncidentApplicationTest {
     @LocalServerPort int port;
     @BeforeEach void reset() {
         for(String table:List.of("repair","activity","evidence","investigation","incident")) db.update("delete from "+table);
-        db.update("update environment set revision=1,checkout_running=true,database_running=true,link_allowed=true,bad_deploy=false");
+        db.update("update environment set revision=1,checkout_running=true,database_running=true,link_allowed=true,bad_deploy=false,checkout_b_running=true,demand_rps=60");
     }
     private Run prepare(String preset) {
         store.preset(new Preset(preset,store.world().revision()));
@@ -104,7 +104,7 @@ class IncidentApplicationTest {
     @Test void missingControlFieldsCannotSilentlyStopAService() {
         assertThatThrownBy(()->store.control(new Control("checkout",null,1))).isInstanceOf(ApiProblem.class);
         assertThatThrownBy(()->store.preset(new Preset("connection",null))).isInstanceOf(ApiProblem.class);
-        assertThat(store.world()).isEqualTo(new World(1,true,true,true,false));
+        assertThat(store.world()).isEqualTo(new World(1,true,true,true,false,true,60));
     }
     @Test void stoppedDatabaseSurvivesNetworkRepairAndPreventsResolution() {
         Run r=prepare("connection");
@@ -145,5 +145,78 @@ class IncidentApplicationTest {
             for(Path file:files.filter(p->p.toString().endsWith(".java")).toList())
                 assertThat(Files.readString(file)).doesNotContain("ai.loomspan.internal","ai.loomspan.autoconfigure");
         }
+    }
+    @Test void demandAndIndependentFaultsComposeAcross128Combinations() {
+        for(int demand:List.of(60,100,150,240)) for(int mask=0;mask<32;mask++) {
+            World w=new World(1,(mask&1)==0,(mask&4)==0,(mask&8)==0,(mask&16)!=0,(mask&2)==0,demand);
+            int online=(w.checkoutRunning()?1:0)+(w.checkoutBRunning()?1:0);
+            int served=w.databaseRunning()&&w.linkAllowed()&&!w.badDeploy()?Math.min(demand,online*100):0;
+            Capacity c=Simulation.capacity(w);
+            assertThat(c.successfulRps()).isEqualTo(served);
+            assertThat(c.failedRps()).isEqualTo(demand-served);
+            assertThat(Simulation.checkout(w).success()).isEqualTo(served==demand);
+            assertThat(Simulation.recovery(w).success()).isEqualTo(served==demand&&online==2);
+        }
+    }
+    @Test void lostRedundancyDoesNotInventAnOutageOrResolveOnOnePassingCheck() {
+        Run r=prepare("redundancy");Receipt e=store.probe(r.id(),"inspectCapacity");
+        assertThat(store.state().capacity().status()).isEqualTo("AT_RISK");
+        assertThat(store.state().checkout().success()).isTrue();
+        assertThat(e.actions()).extracting(Action::id).containsExactly("START_CHECKOUT_B");
+        finish(r,e);
+        RecoveryResult partial=store.verify(r.incidentId());
+        assertThat(partial.customerHealthy()).isTrue();assertThat(partial.redundancyRestored()).isFalse();
+        assertThat(partial.success()).isFalse();assertThat(store.incident(r.incidentId()).status()).isEqualTo("OPEN");
+        Run fresh=store.begin(r.incidentId());store.markRunning(fresh.id());finish(fresh,store.probe(fresh.id(),"inspectCapacity"));
+        store.repair(fresh.incidentId(),new RepairRequest(fresh.id(),"START_CHECKOUT_B"));
+        assertThat(store.verify(fresh.incidentId()).success()).isTrue();
+    }
+    @Test void trafficChangeInvalidatesRepairAndRestartPreservesDemand() {
+        Run r=prepare("redundancy");Receipt e=store.probe(r.id(),"inspectCapacity");finish(r,e);
+        store.traffic(new Traffic(150,store.world().revision()));
+        assertThat(store.state().capacity().successfulRps()).isEqualTo(100);
+        assertThat(store.state().capacity().failedRps()).isEqualTo(50);
+        assertThat(store.state().capacity().status()).isEqualTo("DEGRADED");
+        assertThatThrownBy(()->store.repair(r.incidentId(),new RepairRequest(r.id(),"START_CHECKOUT_B"))).isInstanceOf(ApiProblem.class);
+        assertThat(store.run(r.id()).snapshot().demandRps()).isEqualTo(60);
+        Run fresh=store.begin(r.incidentId());store.markRunning(fresh.id());finish(fresh,store.probe(fresh.id(),"inspectCapacity"));
+        store.repair(fresh.incidentId(),new RepairRequest(fresh.id(),"START_CHECKOUT_B"));
+        assertThat(store.world().demandRps()).isEqualTo(150);
+        assertThat(store.state().capacity().successfulRps()).isEqualTo(150);
+        assertThat(store.verify(fresh.incidentId()).success()).isTrue();
+    }
+    @Test void beyondPoolCapacityHasNoFabricatedRepairAndCannotResolve() {
+        Run r=prepare("healthy");store.fail(r.id(),"Updating demand",null,List.of());
+        store.traffic(new Traffic(240,store.world().revision()));
+        Run fresh=store.begin(r.incidentId());store.markRunning(fresh.id());Receipt e=store.probe(fresh.id(),"inspectCapacity");
+        assertThat(e.actions()).isEmpty();assertThat(e.observation()).contains("maximum configured pool capacity");
+        assertThat(store.state().capacity().failedRps()).isEqualTo(40);finish(fresh,e);
+        assertThat(store.verify(fresh.incidentId()).success()).isFalse();
+        assertThatThrownBy(()->store.traffic(new Traffic(0,store.world().revision()))).isInstanceOf(ApiProblem.class);
+        assertThatThrownBy(()->store.traffic(new Traffic(401,store.world().revision()))).isInstanceOf(ApiProblem.class);
+    }
+    @Test void restartingAnInstancePreservesIndependentDependencyFailures() {
+        World w=new World(1,false,false,false,true,true,150);
+        World repaired=Simulation.repair(w,"START_CHECKOUT_A");
+        assertThat(repaired).isEqualTo(new World(2,true,false,false,true,true,150));
+        assertThat(Simulation.recovery(repaired).success()).isFalse();
+    }
+    @Test void v1DatabaseUpgradePreservesRecordsAndLegacySnapshotMeaning() {
+        var source=new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:upgrade-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa","");
+        org.flywaydb.core.Flyway.configure().dataSource(source).target("1").load().migrate();
+        var old=new JdbcTemplate(source);
+        old.update("update environment set revision=7,checkout_running=false");
+        old.update("insert into incident values ('legacy','Earlier incident','DIAGNOSED','2026-09-07T00:00:00Z','legacy-run')");
+        String snapshot="{\"revision\":7,\"checkoutRunning\":false,\"databaseRunning\":true,\"linkAllowed\":true,\"badDeploy\":false}";
+        old.update("insert into investigation(id,incident_id,status,created_at,snapshot_json) values ('legacy-run','legacy','COMPLETE','2026-09-07T00:00:00Z',?)",snapshot);
+        org.flywaydb.core.Flyway.configure().dataSource(source).load().migrate();
+        var upgraded=new IncidentStore(old,json);
+        assertThat(upgraded.world()).isEqualTo(new World(8,false,true,true,false,true,60));
+        assertThat(upgraded.incident("legacy").title()).isEqualTo("Earlier incident");
+        World historical=upgraded.run("legacy-run").snapshot();
+        assertThat(historical.checkoutBRunning()).isNull();
+        assertThat(Simulation.capacity(historical).targetInstances()).isEqualTo(1);
+        assertThat(Simulation.checkout(historical).success()).isFalse();
+        assertThat(old.queryForObject("select snapshot_json from investigation where id='legacy-run'",String.class)).isEqualTo(snapshot);
     }
 }
