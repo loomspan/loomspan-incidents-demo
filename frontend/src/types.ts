@@ -6,6 +6,8 @@ export type World = {
   badDeploy: boolean;
   checkoutBRunning: boolean | null;
   demandRps: number;
+  cacheRunning: boolean | null;
+  cacheHitPercent: number | null;
 };
 export type Capacity = {
   demandRps: number;
@@ -85,6 +87,15 @@ export type State = {
   environment: World;
   checkout: Check;
   capacity: Capacity;
+  dataLoad: {
+    modeled: boolean;
+    admittedRps: number;
+    effectiveHitPercent: number;
+    cacheHitsRps: number;
+    databaseDemandOps: number;
+    databaseCapacityOps: number;
+    saturated: boolean;
+  };
   incidents: Incident[];
   activity: Activity[];
 };

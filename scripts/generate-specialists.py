@@ -5,7 +5,7 @@ root = Path(__file__).resolve().parents[1] / 'src/main/resources/skills'
 for domain, probe, mission in [
     ('Application', 'inspectApplication', 'Interpret checkout health, logs and deployment history. Distinguish a process outage, code regression and dependency symptom.'),
     ('Network', 'inspectNetwork', 'Interpret DNS, firewall and connectivity evidence. Distinguish blocked traffic from an allowed path to an unavailable dependency.'),
-    ('Database', 'inspectDatabase', 'Interpret local database health and readiness. A healthy local check does not prove the application network path works.'),
+    ('Database', 'inspectDatabase', 'Interpret local database health, cache state, hit rate and offered database operations against capacity. Distinguish a stopped database from a live but saturated database caused by cache misses. A healthy local check does not prove application reachability. Recommend only exact repairs from the receipt; a cache start preserves the configured hit rate.'),
     ('Capacity', 'inspectCapacity', 'Interpret online instances, demand and pool capacity. Distinguish lost redundancy with successful checkout from saturation or total loss of capacity. Propose only the stopped-instance starts offered by the probe. Never treat lowering simulated traffic as a repair, and never invent extra instances.'),
 ]:
     (root / f'investigate{domain}.yml').write_text(f'''name: investigate{domain}

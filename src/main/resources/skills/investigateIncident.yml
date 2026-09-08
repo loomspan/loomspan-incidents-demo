@@ -23,20 +23,31 @@ prompt: |
   Select specialists according to the CURRENT symptom rather than stale ticket text:
   a 500 with validation errors calls for application investigation; a database timeout calls for application, network and
   database investigation to distinguish unhealthy dependencies from blocked paths.
+  Database operations saturated or slow database queries explicitly described in the symptom
+  call for application, capacity and database specialists together. Correlate admitted traffic,
+  cache misses and database operations; a live database process can still be overloaded.
+  A cache service start preserves its hit rate; restoring hit rate preserves service power.
+  Neither repair increases database capacity. Explain remaining faults and verify after one repair.
   Gateway capacity exceeded, no online instance, or a redundancy/availability alert calls for
   BOTH application and capacity specialists. They independently distinguish healthy code from
   too little capacity. Customer requests may succeed while redundancy is lost: explicitly report
   that availability risk rather than inventing a customer outage. Verification requires both
   successful customer checkout and the configured instance availability target.
   A healthy customer check with NO availability alert can use the application specialist alone.
-  If traffic exceeds full configured capacity and all instances are online, no supported repair
-  exists. Explain the capacity shortfall and escalation; do not invent scale-out or traffic reduction.
+  If traffic exceeds full configured capacity and all instances are online, no pool expansion repair
+  exists; dependency repairs may still help if explicitly supported by database evidence. Explain the capacity shortfall and escalation; do not invent scale-out or traffic reduction.
   Independent specialists read the same immutable snapshot and may share a parallelGroup.
   Their findings have no dependencies on one another. Do not call every specialist by default.
   AFTER every selected specialist completes, call readInvestigationEvidence with runId.
   This final evidence-read task MUST depend on all selected investigator tasks and be ungrouped.
   Its return value is the authoritative receipt record. Use it to copy exact IDs and actions
   rather than reconstructing identifiers from summaries. The evidence read does not run probes.
+  In the final report, review EVERY receipt from that final read, including observations
+  that contradict an earlier specialist's hypothesis. Copy evidenceIds verbatim from the
+  final read's id fields; never use a remembered, reconstructed or specialist-invented ID.
+  For each recommendation locate its action in a receipt's actions array, then copy BOTH
+  that action's id and its enclosing receipt's id. A healthy receipt with actions: []
+  cannot support ANY repair, even if its prose suggests investigating another domain.
   Combine their evidence faithfully. Local database health does not prove application reachability.
   Report uncertainty and what remains untested. Do not claim recovery; no repairs occur in this mission.
   Copy exact receipt IDs into evidenceIds. Recommendations may ONLY use action IDs offered in
@@ -77,7 +88,7 @@ output_schema:
         properties:
           actionId:
             type: string
-            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT]
+            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT, START_CACHE, RESTORE_CACHE_HIT_RATE]
           evidenceId: { type: string }
           reason: { type: string }
         required: [actionId, evidenceId, reason]

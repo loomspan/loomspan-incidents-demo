@@ -5,10 +5,10 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
-**Current slice:** two independently controlled checkout instances, variable
-incoming demand, a capacity specialist, and recovery checks that distinguish
-customer availability from lost redundancy. Existing incident records upgrade
-in place and retain their original evidence.
+**Current slice:** cache outages and degradation that cascade into database saturation,
+with application, capacity and database specialists correlating evidence. Includes
+two checkout instances, variable traffic, persistent incidents and verified recovery.
+See the [cache walkthrough and rules](docs/cache-slice.md).
 
 ## Run
 
@@ -86,8 +86,8 @@ outcomes are deterministic.
 4. Reinvestigate the current symptom, apply **Start checkout B**, then verify.
    Traffic stays at 150 requests/s, both instances are online, and all requests succeed.
 5. For an infeasible case, use **Restore healthy**, choose **Beyond pool capacity ·
-   240 req/s**, and open another incident. All 200 requests/s of available capacity
-   are used and 40 requests/s fail. There is no supported scale-out or traffic
+   240 req/s**, and open another incident. The pool admits 200 requests/s,
+   but database load also saturates: 59 requests/s fail. There is no supported scale-out or traffic
    reduction repair; the investigation should explain the shortfall and escalate.
 
 **Overloaded instance** presets step 3 directly. A broken deployment and the
@@ -97,7 +97,7 @@ repair broken code or a blocked dependency. See [capacity rules](docs/capacity-s
 ## Simulation and skill boundaries
 
 `Simulation.java` defines independently composable checkout A/B power, incoming
-demand, database power, network permission, and shared deployment health. The
+demand, database power, network permission, shared deployment health, cache power and cache hit rate. The
 gateway is always available and distributes requests to online instances. Each
 supports 100 requests/s; excess requests receive simulated gateway 503 responses.
 A bad deployment fails before the checkout
@@ -133,6 +133,8 @@ The default database is `data/relay.mv.db`. Flyway initializes it once. Ordinary
 restarts never reset records. **Restore healthy** resets only the simulated
 component state, increments its revision, and preserves all incident history.
 For a separate clean demo, set `RELAY_DATABASE_URL` to a new file database path.
+V3 adds an online cache at 90% hit rate and increments the revision. Earlier snapshots
+retain their original rules; all existing incident history remains intact.
 V2 commissions checkout B online at 60 requests/s and increments the environment
 revision, invalidating old repair proposals. Existing A/database/network/deployment
 conditions and all incident records remain intact. Historical snapshots without
@@ -166,7 +168,7 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 ```
 
 Tests cover all 16 original fault combinations plus 128 two-instance/load cases,
-an actual V1 → V2 migration, redundancy versus outage, demand boundaries, capacity
+V1/V2 → V3 migrations, 707 cache/load combinations, independent cache repairs, redundancy versus outage, demand boundaries, capacity
 repair and no-remedy scenarios, blocked-path evidence, compound recovery,
 immutable snapshots, stale repair rejection, unsupported and cross-run receipts,
 concurrent duplicate repairs, interrupted runs, public Java skill invocation,

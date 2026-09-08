@@ -38,7 +38,7 @@ const probeName = (s: string) =>
   ({
     inspectApplication: "Application probe",
     inspectNetwork: "Network probe",
-    inspectDatabase: "Database probe",
+    inspectDatabase: "Database & cache probe",
     inspectCapacity: "Capacity probe",
   })[s] || s;
 function Pill({
@@ -129,6 +129,7 @@ function App() {
   const w = state.environment,
     check = state.checkout,
     capacity = state.capacity,
+    dataLoad = state.dataLoad,
     run = detail?.runs[0],
     incident = detail?.incident;
   const running = incident?.status === "INVESTIGATING",
@@ -147,6 +148,15 @@ function App() {
       api("/environment/control", {
         control: name,
         enabled,
+        expectedRevision: w.revision,
+      }),
+    );
+  }
+  async function cache(running: boolean, hitPercent: number) {
+    await act(() =>
+      api("/environment/cache", {
+        running,
+        hitPercent,
         expectedRevision: w.revision,
       }),
     );
@@ -464,6 +474,89 @@ function App() {
                 </span>
               </div>
             </div>
+            <div className="capacity-panel cache-panel">
+              <div className="capacity-heading">
+                <div>
+                  <strong>Cache & database load</strong>
+                  <p>
+                    Every checkout writes to the database. Cache misses add a
+                    read.
+                  </p>
+                </div>
+                <Pill good={!dataLoad.saturated}>
+                  {dataLoad.saturated
+                    ? "Database saturated"
+                    : "Database load within capacity"}
+                </Pill>
+              </div>
+              <div className="capacity-metrics">
+                <div>
+                  <span>EFFECTIVE CACHE HIT RATE</span>
+                  <strong>
+                    {dataLoad.effectiveHitPercent}
+                    <small>%</small>
+                  </strong>
+                </div>
+                <div>
+                  <span>CACHE HITS</span>
+                  <strong>
+                    {dataLoad.cacheHitsRps}
+                    <small> /s</small>
+                  </strong>
+                </div>
+                <div className={dataLoad.saturated ? "failed-metric" : ""}>
+                  <span>DATABASE DEMAND</span>
+                  <strong>
+                    {dataLoad.databaseDemandOps}
+                    <small> ops/s</small>
+                  </strong>
+                </div>
+                <div>
+                  <span>DATABASE CAPACITY</span>
+                  <strong>
+                    {dataLoad.databaseCapacityOps}
+                    <small> ops/s</small>
+                  </strong>
+                </div>
+              </div>
+              <div className="traffic-control">
+                <label htmlFor="cache-hit-rate">Cache hit rate</label>
+                <select
+                  id="cache-hit-rate"
+                  disabled={busy}
+                  value={w.cacheHitPercent ?? 90}
+                  onChange={(e) =>
+                    void cache(!!w.cacheRunning, Number(e.target.value))
+                  }
+                >
+                  <option value={90}>Healthy · 90%</option>
+                  <option value={20}>Degraded · 20%</option>
+                  <option value={0}>All reads miss · 0%</option>
+                  {![90, 20, 0].includes(w.cacheHitPercent ?? 90) && (
+                    <option value={w.cacheHitPercent!}>
+                      Custom · {w.cacheHitPercent}%
+                    </option>
+                  )}
+                </select>
+                <button
+                  className={"switch " + (w.cacheRunning ? "on" : "")}
+                  role="switch"
+                  aria-checked={!!w.cacheRunning}
+                  aria-label="Cache service running"
+                  disabled={busy}
+                  onClick={() =>
+                    void cache(!w.cacheRunning, w.cacheHitPercent ?? 90)
+                  }
+                >
+                  <span />
+                </button>
+                <span>
+                  Cache {w.cacheRunning ? "online" : "offline"} ·{" "}
+                  {dataLoad.admittedRps} admitted requests/s. Database demand is
+                  offered load, not completed operations.
+                </span>
+              </div>
+            </div>
             <div className="environment-controls">
               <div>
                 <span className="control-icon">⇄</span>
@@ -498,6 +591,8 @@ function App() {
                 ["compound", "Two faults"],
                 ["redundancy", "Lost redundancy"],
                 ["overload", "Overloaded instance"],
+                ["cache", "Cache outage"],
+                ["cache-degraded", "Cache degradation"],
               ].map(([name, label]) => (
                 <button
                   disabled={busy}
@@ -897,7 +992,9 @@ function Evidence({ receipt: e, cited }: { receipt: Receipt; cited: boolean }) {
         <span>
           {time(e.observedAt)} · REV {e.revision}
         </span>
-        <code title={e.id}>{e.id.slice(0, 8)}</code>
+        <code title={e.id}>
+          {e.id.startsWith("evidence-") ? e.id : e.id.slice(0, 8)}
+        </code>
       </div>
     </article>
   );

@@ -1,5 +1,8 @@
 # Checkout capacity and redundancy
 
+> This records the capacity slice before V3. Current worlds also model cache and
+> database limits; see [cache rules](cache-slice.md). Historical snapshots keep these original rules.
+
 ## Demonstration
 
 The storefront has checkout A and B. The gateway distributes work across online

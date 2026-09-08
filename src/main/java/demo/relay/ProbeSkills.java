@@ -15,7 +15,7 @@ public class ProbeSkills {
     public Receipt inspectCapacity(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) { return store.probe(runId,"inspectCapacity"); }
     @SkillMethod(description="Check DNS, checkout to database connectivity and firewall counters. Returns an immutable evidence receipt and any supported repairs.")
     public Receipt inspectNetwork(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) { return store.probe(runId,"inspectNetwork"); }
-    @SkillMethod(description="Check database process, local readiness and connection capacity. Returns an immutable evidence receipt and any supported repairs.")
+    @SkillMethod(description="Check database process, readiness, cache service, hit rate and database operation demand versus capacity. Returns an immutable evidence receipt and any supported repairs.")
     public Receipt inspectDatabase(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) { return store.probe(runId,"inspectDatabase"); }
     @SkillMethod(description="Read the authoritative evidence receipts already collected by this investigation's specialists. Call after all selected investigators complete to obtain exact receipt and supported repair IDs for the final report. Does not run probes.")
     public java.util.List<Receipt> readInvestigationEvidence(@SkillParam(description="Exact investigation runId supplied by the caller") String runId) {

@@ -26,7 +26,7 @@ class IncidentApplicationTest {
     @LocalServerPort int port;
     @BeforeEach void reset() {
         for(String table:List.of("repair","activity","evidence","investigation","incident")) db.update("delete from "+table);
-        db.update("update environment set revision=1,checkout_running=true,database_running=true,link_allowed=true,bad_deploy=false,checkout_b_running=true,demand_rps=60");
+        db.update("update environment set revision=1,checkout_running=true,database_running=true,link_allowed=true,bad_deploy=false,checkout_b_running=true,demand_rps=60,cache_running=true,cache_hit_percent=90");
     }
     private Run prepare(String preset) {
         store.preset(new Preset(preset,store.world().revision()));
@@ -104,7 +104,7 @@ class IncidentApplicationTest {
     @Test void missingControlFieldsCannotSilentlyStopAService() {
         assertThatThrownBy(()->store.control(new Control("checkout",null,1))).isInstanceOf(ApiProblem.class);
         assertThatThrownBy(()->store.preset(new Preset("connection",null))).isInstanceOf(ApiProblem.class);
-        assertThat(store.world()).isEqualTo(new World(1,true,true,true,false,true,60));
+        assertThat(store.world()).isEqualTo(new World(1,true,true,true,false,true,60,true,90));
     }
     @Test void stoppedDatabaseSurvivesNetworkRepairAndPreventsResolution() {
         Run r=prepare("connection");
@@ -190,7 +190,7 @@ class IncidentApplicationTest {
         store.traffic(new Traffic(240,store.world().revision()));
         Run fresh=store.begin(r.incidentId());store.markRunning(fresh.id());Receipt e=store.probe(fresh.id(),"inspectCapacity");
         assertThat(e.actions()).isEmpty();assertThat(e.observation()).contains("maximum configured pool capacity");
-        assertThat(store.state().capacity().failedRps()).isEqualTo(40);finish(fresh,e);
+        assertThat(store.state().capacity().failedRps()).isEqualTo(59);finish(fresh,e);
         assertThat(store.verify(fresh.incidentId()).success()).isFalse();
         assertThatThrownBy(()->store.traffic(new Traffic(0,store.world().revision()))).isInstanceOf(ApiProblem.class);
         assertThatThrownBy(()->store.traffic(new Traffic(401,store.world().revision()))).isInstanceOf(ApiProblem.class);
@@ -211,12 +211,78 @@ class IncidentApplicationTest {
         old.update("insert into investigation(id,incident_id,status,created_at,snapshot_json) values ('legacy-run','legacy','COMPLETE','2026-09-07T00:00:00Z',?)",snapshot);
         org.flywaydb.core.Flyway.configure().dataSource(source).load().migrate();
         var upgraded=new IncidentStore(old,json);
-        assertThat(upgraded.world()).isEqualTo(new World(8,false,true,true,false,true,60));
+        assertThat(upgraded.world()).isEqualTo(new World(9,false,true,true,false,true,60,true,90));
         assertThat(upgraded.incident("legacy").title()).isEqualTo("Earlier incident");
         World historical=upgraded.run("legacy-run").snapshot();
         assertThat(historical.checkoutBRunning()).isNull();
         assertThat(Simulation.capacity(historical).targetInstances()).isEqualTo(1);
         assertThat(Simulation.checkout(historical).success()).isFalse();
         assertThat(old.queryForObject("select snapshot_json from investigation where id='legacy-run'",String.class)).isEqualTo(snapshot);
+    }
+    @Test void cacheMissesCauseSaturationAndRecoveryWithoutChangingTraffic() {
+        Run r=prepare("cache-degraded");
+        assertThat(store.state().dataLoad().databaseDemandOps()).isEqualTo(270);
+        assertThat(store.state().capacity().successfulRps()).isEqualTo(111);
+        assertThat(store.state().capacity().onlineInstances()).isEqualTo(2);
+        Receipt e=store.probe(r.id(),"inspectDatabase");
+        assertThat(e.observation()).contains("Local readiness and SELECT 1 pass", "SATURATED");
+        assertThat(e.actions()).extracting(Action::id).containsExactly("RESTORE_CACHE_HIT_RATE");
+        finish(r,e);store.repair(r.incidentId(),new RepairRequest(r.id(),"RESTORE_CACHE_HIT_RATE"));
+        assertThat(store.state().dataLoad().databaseDemandOps()).isEqualTo(165);
+        assertThat(store.world().demandRps()).isEqualTo(150);
+        assertThat(store.verify(r.incidentId()).success()).isTrue();
+    }
+    @Test void cachePowerAndHitRateAreIndependentAndReinvestigationIsRequired() {
+        Run old=prepare("cache");finish(old,store.probe(old.id(),"inspectDatabase"));
+        store.cache(new CacheSettings(false,20,store.world().revision()));
+        assertThatThrownBy(()->store.repair(old.incidentId(),new RepairRequest(old.id(),"START_CACHE"))).isInstanceOf(ApiProblem.class);
+        assertThat(old.snapshot().cacheHitPercent()).isEqualTo(90);
+        Run r=store.begin(old.incidentId());store.markRunning(r.id());finish(r,store.probe(r.id(),"inspectDatabase"));
+        store.repair(r.incidentId(),new RepairRequest(r.id(),"START_CACHE"));
+        assertThat(store.world().cacheHitPercent()).isEqualTo(20);
+        assertThat(store.verify(r.incidentId()).success()).isFalse();
+        Run fresh=store.begin(r.incidentId());store.markRunning(fresh.id());finish(fresh,store.probe(fresh.id(),"inspectDatabase"));
+        store.repair(r.incidentId(),new RepairRequest(fresh.id(),"RESTORE_CACHE_HIT_RATE"));
+        assertThat(store.verify(r.incidentId()).success()).isTrue();
+    }
+    @Test void cacheLoadBoundariesAndUpstreamFaultsRemainConsistent() {
+        for(int hit=0;hit<=100;hit++) for(int demand:List.of(1,60,100,150,200,240,400)) {
+            World w=new World(1,true,true,true,false,true,demand,true,hit);
+            DataLoad d=Simulation.dataLoad(w);Capacity c=Simulation.capacity(w);
+            int admitted=Math.min(demand,200),ops=admitted*2-admitted*hit/100;
+            assertThat(d.databaseDemandOps()).isEqualTo(ops);
+            assertThat(c.successfulRps()).isEqualTo(ops>200?admitted*200/ops:admitted);
+            assertThat(c.successfulRps()+c.failedRps()).isEqualTo(demand);
+        }
+        World stopped=new World(1,true,true,true,false,false,150,false,90);
+        World restarted=Simulation.repair(stopped,"START_CHECKOUT_B");
+        assertThat(Simulation.capacity(stopped).successfulRps()).isEqualTo(100);
+        assertThat(Simulation.capacity(restarted).successfulRps()).isEqualTo(100);
+        assertThat(Simulation.recovery(restarted).success()).isFalse();
+        World masked=new World(1,true,false,false,true,true,150,false,20);
+        World repaired=Simulation.repair(masked,"RESTORE_CACHE_HIT_RATE");
+        assertThat(repaired).isEqualTo(new World(2,true,false,false,true,true,150,false,90));
+        assertThat(Simulation.dataLoad(repaired).databaseDemandOps()).isZero();
+        assertThat(Simulation.recovery(repaired).success()).isFalse();
+        assertThat(Simulation.recovery(new World(1,true,true,true,false,true,60,false,90)).success()).isTrue();
+    }
+    @Test void invalidCacheSettingsDoNotChangeTheWorld() {
+        World before=store.world();
+        for(CacheSettings c:List.of(new CacheSettings(null,90,1),new CacheSettings(true,null,1),new CacheSettings(true,-1,1),new CacheSettings(true,101,1),new CacheSettings(true,90,null),new CacheSettings(true,90,0)))
+            assertThatThrownBy(()->store.cache(c)).isInstanceOf(ApiProblem.class);
+        assertThat(store.world()).isEqualTo(before);
+    }
+    @Test void v2SnapshotsKeepOriginalCapacityAfterCacheMigration() {
+        var source=new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:cache-upgrade-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa","");
+        org.flywaydb.core.Flyway.configure().dataSource(source).target("2").load().migrate();
+        var old=new JdbcTemplate(source);
+        String snapshot=json.writeValueAsString(new World(7,true,true,true,false,true,240));
+        old.update("insert into incident values ('old','Capacity incident','RESOLVED','2026-09-07T00:00:00Z','old-run')");
+        old.update("insert into investigation(id,incident_id,status,created_at,snapshot_json) values ('old-run','old','COMPLETE','2026-09-07T00:00:00Z',?)",snapshot);
+        org.flywaydb.core.Flyway.configure().dataSource(source).load().migrate();
+        World historical=new IncidentStore(old,json).run("old-run").snapshot();
+        assertThat(historical.cacheRunning()).isNull();
+        assertThat(Simulation.capacity(historical).failedRps()).isEqualTo(40);
+        assertThat(old.queryForObject("select snapshot_json from investigation where id='old-run'",String.class)).isEqualTo(snapshot);
     }
 }

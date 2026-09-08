@@ -69,4 +69,18 @@ class LiveInvestigationTest {
         assertThat(r.report().recommendations()).isEmpty();
         assertThat(store.verify(i.id()).success()).isFalse();
     }
+    @Test void cacheFailuresCoordinateApplicationCapacityAndDatabaseEvidence() {
+        for(String preset:List.of("cache","cache-degraded")) {
+            store.preset(new Preset(preset,store.world().revision()));
+            Incident i=store.create(new NewIncident(null));Run r=investigate(i.id());
+            assertThat(r.evidence()).extracting(Receipt::probe).contains("inspectApplication","inspectCapacity","inspectDatabase");
+            String action=preset.equals("cache")?"START_CACHE":"RESTORE_CACHE_HIT_RATE";
+            assertThat(r.report().recommendations()).extracting(Recommendation::actionId).containsExactly(action);
+            assertThat((r.report().summary()+r.report().likelyCause()).toLowerCase()).contains("cache");
+            store.repair(i.id(),new RepairRequest(r.id(),action));
+            assertThat(store.world().demandRps()).isEqualTo(150);
+            assertThat(store.state().dataLoad().databaseDemandOps()).isEqualTo(165);
+            assertThat(store.verify(i.id()).success()).isTrue();
+        }
+    }
 }

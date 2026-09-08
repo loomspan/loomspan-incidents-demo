@@ -1,5 +1,30 @@
 # Verification record
 
+## Cache and cascading database load — 2026-09-07
+
+- `cache-all-verified.log`: 28 tests passed: 24 deterministic integration tests
+  and four live-provider tests (including both cache outage and degradation).
+- Covered 707 cache/load combinations, upstream masking, a checkout restart that
+  cannot relieve the DB bottleneck, independent cache power/hit-rate repairs,
+  stale cache proposals, invalid settings, and V1/V2 snapshot migrations.
+- Initial live runs rejected miscopied UUID references. New receipts now use short
+  database-unique sequence handles; old IDs and strict run/action validation remain.
+  The full live and deterministic suite then passed.
+- Production frontend type checking and Vite build passed. Packaged with
+  `mvnw.cmd package -DskipTests` after the full suite passed.
+- Backed up the existing file DB as `data/relay-before-cache.mv.db`, applied V3,
+  and compared both existing incidents before and after upgrade: reports, receipts,
+  execution events and incident activities were unchanged. Revision increased once.
+- Browser verified the degradation preset, 270 ops/s and 39 failures, investigation
+  with application/capacity/database receipts, repair to 165 ops/s and zero failures,
+  and verified resolution. Cache power and hit-rate controls were also exercised.
+- One browser run was rejected for an unsupported action citation; reinvestigation
+  succeeded. The failed run and receipts remain in history. Short receipt handles
+  reduce copying complexity but do not guarantee valid model output; invalid reports
+  still require a retry. No validation was weakened.
+- Desktop layout was visually inspected. Mobile layout was not device-tested.
+
+
 ## Capacity slice — September 7, 2026
 
 The capacity build passed 19 deterministic tests and three opt-in live-model

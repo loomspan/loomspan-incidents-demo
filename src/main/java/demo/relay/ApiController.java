@@ -13,6 +13,7 @@ public class ApiController {
     @PostMapping("/environment/control") public World control(@RequestBody Control c) { return store.control(c); }
     @PostMapping("/environment/preset") public World preset(@RequestBody Preset p) { return store.preset(p); }
     @PostMapping("/environment/traffic") public World traffic(@RequestBody Traffic t) { return store.traffic(t); }
+    @PostMapping("/environment/cache") public World cache(@RequestBody CacheSettings c) { return store.cache(c); }
     @PostMapping("/checkout") public TransactionResult checkout() { return Simulation.checkout(store.world()); }
     @PostMapping("/incidents") public Incident create(@RequestBody NewIncident i) { return store.create(i); }
     @GetMapping("/incidents/{id}") public Detail detail(@PathVariable String id) { return store.detail(id); }

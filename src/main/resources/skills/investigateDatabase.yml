@@ -1,10 +1,10 @@
 name: investigateDatabase
-description: Interpret local database health and readiness. A healthy local check does not prove the application network path works.
+description: Interpret local database health, cache state, hit rate and offered database operations against capacity. Distinguish a stopped database from a live but saturated database caused by cache misses. A healthy local check does not prove application reachability. Recommend only exact repairs from the receipt; a cache start preserves the configured hit rate.
 model: investigator
 allowed_skills:
   - name: inspectDatabase
 prompt: |
-  Interpret local database health and readiness. A healthy local check does not prove the application network path works.
+  Interpret local database health, cache state, hit rate and offered database operations against capacity. Distinguish a stopped database from a live but saturated database caused by cache misses. A healthy local check does not prove application reachability. Recommend only exact repairs from the receipt; a cache start preserves the configured hit rate.
   Call inspectDatabase with the exact runId. Never invent a receipt or observation.
   Return a concise summary and copy every field of the returned receipt into receipts.
   Preserve the receipt ID and supported action IDs exactly, including healthy observations

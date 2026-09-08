@@ -7,10 +7,10 @@ fictional storefront. The database is real; servers, network traffic, logs and
 transactions are simulated. A single Java dependency model gives all probes
 consistent observations without launching containers or touching real hosts.
 
-The current slice adds two checkout instances, variable traffic, six presets,
+The current slice includes two checkout instances, cache power and hit rate, variable traffic, eight presets,
 persistent incidents, asynchronous model investigation, four focused specialists,
 saved evidence, supported repair proposals, verified resolution and historical runs.
-See [capacity rules](capacity-slice.md) for the new behavior and migration contract.
+See [cache rules](cache-slice.md) for cascading database load and [capacity rules](capacity-slice.md) for the new behavior and migration contract.
 
 ## Ownership
 
@@ -50,9 +50,9 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
 
 ## Deliberate limits
 
-- One storefront, two checkout instances and one database; no tenants, real hosts or external
+- One storefront, two checkout instances, one cache and one database; no tenants, real hosts or external
   monitoring integration.
-- No random failure generation, real clock progression, cache, configurable gateway faults,
+- No random failure generation, real clock progression, configurable gateway faults,
   DNS fault switch, or automatic background alert detection yet.
 - Investigations observe immutable snapshots. They do not automatically interrupt
   and replan when the presenter changes controls during an active model call.
@@ -68,8 +68,7 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
 
 ## Candidate follow-on slices
 
-1. Cache degradation with database load: trace a cascading performance problem.
-2. Additional path-specific failures such as DNS and region-specific connectivity.
-3. Role-constrained remediation and an explicitly enabled automatic repair policy.
-4. Controlled snapshot refresh during investigation, if the framework's supported
+1. Additional path-specific failures such as DNS and region-specific connectivity.
+2. Role-constrained remediation and an explicitly enabled automatic repair policy.
+3. Controlled snapshot refresh during investigation, if the framework's supported
    mission semantics make that useful without hidden state propagation.
