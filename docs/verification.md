@@ -1,5 +1,23 @@
 # Verification record
 
+## DNS and layered connectivity — 2026-09-07
+
+- **48 deterministic tests passed**, with seven opt-in live tests skipped in the
+  ordinary suite (`target/dns-tests.log`). Five new tests cover probe visibility,
+  historical semantics, independent controls/repairs, revision fencing, role
+  denial and the two-stage automatic repair sequence.
+- The new live DNS/firewall test passed (`target/dns-live.log`). Two real model
+  investigations produced distinct DNS and firewall repair proposals, with failed
+  verification and a fresh snapshot between them. Other live tests were not rerun.
+- Browser verification prepared the standalone DNS walkthrough as Presenter,
+  investigated it as Commander, applied the DNS proposal and verified recovery.
+  INC-008 preserves the three specialist receipts and revision 28-to-29 recovery.
+  Desktop controls and walkthrough layout were visually inspected.
+- V7 preserved the world and all seven previous incident histories. Only the new
+  nullable snapshot field and live healthy DNS field differ in API shape. Backup:
+  `data/relay-before-dns.mv.db`; before/after comparisons are in target.
+- Frontend type checking and runnable packaging passed. Mobile was not device-tested.
+
 ## Authenticated operator roles — 2026-09-07
 
 - **43 deterministic tests passed**, including seven new security tests covering

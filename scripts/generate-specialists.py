@@ -4,7 +4,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1] / 'src/main/resources/skills'
 for domain, probe, mission in [
     ('Application', 'inspectApplication', 'Interpret checkout health, logs and deployment history. Distinguish a process outage, code regression and dependency symptom.'),
-    ('Network', 'inspectNetwork', 'Interpret DNS, firewall and connectivity evidence. Distinguish blocked traffic from an allowed path to an unavailable dependency.'),
+    ('Network', 'inspectNetwork', 'Interpret DNS, firewall and connectivity evidence. NXDOMAIN prevents hostname-based TCP testing; do not infer firewall health or propose its repair until fresh evidence after DNS restoration supports it. Distinguish blocked traffic from an allowed path to an unavailable dependency.'),
     ('Database', 'inspectDatabase', 'Interpret local database health, cache state, hit rate and offered database operations against capacity. Distinguish a stopped database from a live but saturated database caused by cache misses. A healthy local check does not prove application reachability. Recommend only exact repairs from the receipt; a cache start preserves the configured hit rate.'),
     ('Capacity', 'inspectCapacity', 'Interpret online instances, demand and pool capacity. Distinguish lost redundancy with successful checkout from saturation or total loss of capacity. Propose only the stopped-instance starts offered by the probe. Never treat lowering simulated traffic as a repair, and never invent extra instances.'),
 ]:
@@ -60,4 +60,4 @@ output_schema:
   required: [summary, receipts]
   additionalProperties: false
 output_schema_max_retries: 2
-''', encoding='utf-8')
+''', encoding='utf-8', newline='\n')

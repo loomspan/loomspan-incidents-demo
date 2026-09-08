@@ -3,6 +3,7 @@ export type World = {
   checkoutRunning: boolean;
   databaseRunning: boolean;
   linkAllowed: boolean;
+  dnsHealthy: boolean | null;
   badDeploy: boolean;
   checkoutBRunning: boolean | null;
   demandRps: number;

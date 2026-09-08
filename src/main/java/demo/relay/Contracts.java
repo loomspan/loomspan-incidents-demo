@@ -6,7 +6,11 @@ public final class Contracts {
     private Contracts() {}
     public record World(int revision, boolean checkoutRunning, boolean databaseRunning,
                         boolean linkAllowed, boolean badDeploy, Boolean checkoutBRunning, Integer demandRps,
-                        Boolean cacheRunning, Integer cacheHitPercent) {
+                        Boolean cacheRunning, Integer cacheHitPercent, Boolean dnsHealthy) {
+        public World(int revision, boolean a, boolean db, boolean link, boolean bad, Boolean b, Integer demand, Boolean cache, Integer hit) {
+            this(revision,a,db,link,bad,b,demand,cache,hit,null);
+        }
+        public World withDns(Boolean healthy) { return new World(revision,checkoutRunning,databaseRunning,linkAllowed,badDeploy,checkoutBRunning,demandRps,cacheRunning,cacheHitPercent,healthy); }
         public World { if(demandRps==null) demandRps=60; }
         public World(int revision, boolean a, boolean db, boolean link, boolean bad, Boolean b, Integer demand) {
             this(revision,a,db,link,bad,b,demand,null,null);

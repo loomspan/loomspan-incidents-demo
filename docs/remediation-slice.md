@@ -12,7 +12,7 @@ repair permissions and limit; changing the form never changes an active policy.
 
 The automatic policy starts with cache service start and hit-rate restoration
 selected in the UI, a two-repair limit, and no other selected repairs. The server
-accepts only the seven known repair IDs and limits from one to three. An empty
+accepts only the eight known repair IDs and limits from one to three. An empty
 permission list grants no automatic repairs. Permissions are application rules
 for this local simulator. They are evaluated alongside the authenticated operator's
 role: both must authorize a repair. See [operator roles](operator-roles.md) for

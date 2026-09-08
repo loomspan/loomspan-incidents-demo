@@ -1,11 +1,11 @@
 name: investigateNetwork
-description: Interpret DNS, firewall and connectivity evidence. Distinguish blocked traffic from an allowed path to an unavailable dependency.
+description: Interpret DNS, firewall and connectivity evidence. NXDOMAIN prevents hostname-based TCP testing; do not infer firewall health or propose its repair until fresh evidence after DNS restoration supports it. Distinguish blocked traffic from an allowed path to an unavailable dependency.
 rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills:
   - name: inspectNetwork
 prompt: |
-  Interpret DNS, firewall and connectivity evidence. Distinguish blocked traffic from an allowed path to an unavailable dependency.
+  Interpret DNS, firewall and connectivity evidence. NXDOMAIN prevents hostname-based TCP testing; do not infer firewall health or propose its repair until fresh evidence after DNS restoration supports it. Distinguish blocked traffic from an allowed path to an unavailable dependency.
   Call inspectNetwork with the exact runId. Never invent a receipt or observation.
   Return a concise summary and copy every field of the returned receipt into receipts.
   Preserve the receipt ID and supported action IDs exactly, including healthy observations

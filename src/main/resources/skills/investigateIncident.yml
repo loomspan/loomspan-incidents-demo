@@ -24,6 +24,10 @@ prompt: |
   Select specialists according to the CURRENT symptom rather than stale ticket text:
   a 500 with validation errors calls for application investigation; a database timeout calls for application, network and
   database investigation to distinguish unhealthy dependencies from blocked paths.
+  A database connection that could not be established also calls for application, network and
+  database investigation: distinguish DNS resolution failure from a stopped database or firewall block.
+  If DNS fails, hostname-based TCP testing is unavailable. Do not infer firewall health or
+  recommend its repair without a supporting receipt; restore DNS and reassess on fresh evidence.
   Database operations saturated or slow database queries explicitly described in the symptom
   call for application, capacity and database specialists together. Correlate admitted traffic,
   cache misses and database operations; a live database process can still be overloaded.
@@ -91,7 +95,7 @@ output_schema:
         properties:
           actionId:
             type: string
-            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT, START_CACHE, RESTORE_CACHE_HIT_RATE]
+            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_DNS, RESTORE_DB_LINK, ROLLBACK_CHECKOUT, START_CACHE, RESTORE_CACHE_HIT_RATE]
           evidenceId: { type: string }
           reason: { type: string }
         required: [actionId, evidenceId, reason]

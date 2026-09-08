@@ -9,6 +9,39 @@ import type {
 
 export const scenarios = [
   {
+    id: "dns",
+    title: "A healthy database with no address",
+    tag: "NAME RESOLUTION",
+    symptom:
+      "Checkout cannot connect to a database whose local health checks pass.",
+    lesson:
+      "Application errors and network evidence distinguish DNS failure from a stopped database or blocked firewall.",
+    mode: "RECOMMEND",
+    steps: [
+      "Prepare as Presenter, then investigate as Responder.",
+      "Review the NXDOMAIN evidence. Switch to Commander to restore the database DNS record.",
+      "Verify checkout and instance availability before resolving.",
+    ],
+    watch:
+      "Healthy processes cannot compensate for a missing hostname record. DNS repair needs commander authorization.",
+  },
+  {
+    id: "dns-compound",
+    title: "DNS recovery reveals a blocked path",
+    tag: "FRESH EVIDENCE",
+    symptom: "Checkout cannot establish a database connection.",
+    lesson:
+      "Restoring name resolution makes the next network check possible. A firewall fault then requires a second repair.",
+    mode: "RECOMMEND",
+    steps: [
+      "Prepare as Presenter; investigate as Responder and review the DNS evidence.",
+      "Switch to Commander, restore DNS, and verify. Connection timeouts should remain.",
+      "Reinvestigate the fresh snapshot, restore the now-observed blocked connection, and verify recovery.",
+    ],
+    watch:
+      "The first network receipt offers only DNS restoration. Firewall repair requires new evidence after DNS works. Commander can also use Auto-repair with both permissions and a limit of two.",
+  },
+  {
     id: "cache-compound",
     title: "Two-stage cache recovery",
     tag: "START HERE",

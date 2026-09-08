@@ -7,7 +7,7 @@ fictional storefront. The database is real; servers, network traffic, logs and
 transactions are simulated. A single Java dependency model gives all probes
 consistent observations without launching containers or touching real hosts.
 
-The current slice includes two checkout instances, cache power and hit rate, variable traffic, nine presets,
+The current slice includes two checkout instances, cache power and hit rate, variable traffic, independent DNS state, eleven presets,
 persistent incidents, asynchronous model investigation, four focused specialists,
 saved evidence, supported repair proposals, verified resolution and historical runs.
 See [cache rules](cache-slice.md) for cascading database load and [capacity rules](capacity-slice.md) for the new behavior and migration contract.
@@ -57,7 +57,7 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
 - One storefront, two checkout instances, one cache and one database; no tenants, real hosts or external
   monitoring integration.
 - No random failure generation, real clock progression, configurable gateway faults,
-  DNS fault switch, or automatic background alert detection yet.
+  automatic background alert detection yet. DNS has an independent fault control.
 - Investigations observe immutable snapshots. They do not automatically interrupt
   and replan when the presenter changes controls during an active model call.
 - Traffic is a deterministic one-second aggregate with fixed per-instance capacity
@@ -73,7 +73,7 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
 
 ## Candidate follow-on slices
 
-1. Additional path-specific failures such as DNS and region-specific connectivity.
+1. Region-specific connectivity failures. DNS and layered firewall recovery are implemented; see [DNS scenarios](dns-slice.md).
 2. Controlled snapshot refresh during investigation, if the framework's supported
    mission semantics make that useful without hidden state propagation.
 

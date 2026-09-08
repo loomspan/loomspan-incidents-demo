@@ -49,10 +49,10 @@ public class OperatorSecurity {
         return auth==null || !auth.isAuthenticated() || auth.getName().equals("anonymousUser")?null:auth.getName();
     }
     static boolean canRepair(String action) {
-        return role("COMMANDER") || (role("RESPONDER") && !Set.of("ROLLBACK_CHECKOUT","RESTORE_DB_LINK").contains(action));
+        return role("COMMANDER") || (role("RESPONDER") && !Set.of("ROLLBACK_CHECKOUT","RESTORE_DB_LINK","RESTORE_DB_DNS").contains(action));
     }
     static void requireRepair(String action) {
-        if(!canRepair(action)) throw new org.springframework.security.access.AccessDeniedException("This repair requires an authorized operator; rollback and network changes require an incident commander.");
+        if(!canRepair(action)) throw new org.springframework.security.access.AccessDeniedException("This repair requires an authorized operator; rollback, DNS and network changes require an incident commander.");
     }
 }
 

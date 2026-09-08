@@ -78,6 +78,7 @@ const repairChoices = [
   ["START_CHECKOUT_A", "Start checkout A"],
   ["START_CHECKOUT_B", "Start checkout B"],
   ["START_DATABASE", "Start database"],
+  ["RESTORE_DB_DNS", "Restore database DNS record"],
   ["RESTORE_DB_LINK", "Restore database connection"],
   ["ROLLBACK_CHECKOUT", "Roll back checkout"],
 ];
@@ -87,7 +88,10 @@ function App({ operator, logout }: { operator: Operator; logout: () => void }) {
   const responder = commander || operator.roles.includes("RESPONDER");
   const canRepair = (action: string) =>
     responder &&
-    (commander || !["RESTORE_DB_LINK", "ROLLBACK_CHECKOUT"].includes(action));
+    (commander ||
+      !["RESTORE_DB_DNS", "RESTORE_DB_LINK", "ROLLBACK_CHECKOUT"].includes(
+        action,
+      ));
   const [guide, setGuide] = useState(
     sessionStorage.getItem("relay.guide") || "cache-compound",
   );
@@ -226,7 +230,11 @@ function App({ operator, logout }: { operator: Operator; logout: () => void }) {
       });
       const i = await api<Incident>("/incidents", { title: null });
       setMode(scenario.mode);
-      setAllowedActions(["START_CACHE", "RESTORE_CACHE_HIT_RATE"]);
+      setAllowedActions(
+        scenario.id.startsWith("dns")
+          ? ["RESTORE_DB_DNS", "RESTORE_DB_LINK"]
+          : ["START_CACHE", "RESTORE_CACHE_HIT_RATE"],
+      );
       setMaxRepairs(2);
       select(i.id);
       setTitle("");
@@ -657,6 +665,18 @@ function App({ operator, logout }: { operator: Operator; logout: () => void }) {
             </div>
             <div className="environment-controls">
               <div>
+                <span className="control-icon">@</span>
+                <div>
+                  <strong>Database DNS record</strong>
+                  <small>orders-db.internal name resolution</small>
+                </div>
+                {toggle(
+                  "dns",
+                  w.dnsHealthy !== false,
+                  "Database DNS record healthy",
+                )}
+              </div>
+              <div>
                 <span className="control-icon">⇄</span>
                 <div>
                   <strong>Database connection</strong>
@@ -684,6 +704,8 @@ function App({ operator, logout }: { operator: Operator; logout: () => void }) {
             <div className="presets">
               <span>TRY A SCENARIO</span>
               {[
+                ["dns", "Missing database DNS"],
+                ["dns-compound", "DNS + blocked connection"],
                 ["connection", "Blocked connection"],
                 ["deployment", "Bad deployment"],
                 ["compound", "Two faults"],

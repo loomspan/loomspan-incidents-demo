@@ -105,7 +105,7 @@ class IncidentApplicationTest {
     @Test void missingControlFieldsCannotSilentlyStopAService() {
         assertThatThrownBy(()->store.control(new Control("checkout",null,1))).isInstanceOf(ApiProblem.class);
         assertThatThrownBy(()->store.preset(new Preset("connection",null))).isInstanceOf(ApiProblem.class);
-        assertThat(store.world()).isEqualTo(new World(1,true,true,true,false,true,60,true,90));
+        assertThat(store.world()).isEqualTo(new World(1,true,true,true,false,true,60,true,90,true));
     }
     @Test void stoppedDatabaseSurvivesNetworkRepairAndPreventsResolution() {
         Run r=prepare("connection");
@@ -212,7 +212,7 @@ class IncidentApplicationTest {
         old.update("insert into investigation(id,incident_id,status,created_at,snapshot_json) values ('legacy-run','legacy','COMPLETE','2026-09-07T00:00:00Z',?)",snapshot);
         org.flywaydb.core.Flyway.configure().dataSource(source).load().migrate();
         var upgraded=new IncidentStore(old,json);
-        assertThat(upgraded.world()).isEqualTo(new World(9,false,true,true,false,true,60,true,90));
+        assertThat(upgraded.world()).isEqualTo(new World(9,false,true,true,false,true,60,true,90,true));
         assertThat(upgraded.incident("legacy").title()).isEqualTo("Earlier incident");
         World historical=upgraded.run("legacy-run").snapshot();
         assertThat(historical.checkoutBRunning()).isNull();

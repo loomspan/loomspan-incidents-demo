@@ -8,7 +8,7 @@ demo accounts share the password `relay-demo`:
 | `viewer` | Read incidents, evidence, measurements and history; run customer checks |
 | `presenter` | Viewer access, environment controls and incident preparation |
 | `responder` | Viewer access, create incidents, investigate, stop operations, verify recovery and apply routine repairs |
-| `commander` | Responder capabilities plus deployment rollback and database network restoration |
+| `commander` | Responder capabilities plus deployment rollback, database DNS and network restoration |
 
 Presenter is a separate role. Neither responders nor commanders can change faults
 through the environment API. These are local demonstration accounts, not an

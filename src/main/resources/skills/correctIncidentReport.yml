@@ -42,7 +42,7 @@ output_schema:
         properties:
           actionId:
             type: string
-            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_LINK, ROLLBACK_CHECKOUT, START_CACHE, RESTORE_CACHE_HIT_RATE]
+            enum: [START_CHECKOUT_A, START_CHECKOUT_B, START_DATABASE, RESTORE_DB_DNS, RESTORE_DB_LINK, ROLLBACK_CHECKOUT, START_CACHE, RESTORE_CACHE_HIT_RATE]
           evidenceId: { type: string }
           reason: { type: string }
         required: [actionId, evidenceId, reason]

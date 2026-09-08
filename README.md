@@ -5,13 +5,14 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
-**Current slice:** authenticated operator roles, framework skill permissions, and
-an audit trail identifying who investigated and repaired each incident.
-Sign in as `presenter` to prepare a walkthrough, then switch to `responder` to
-investigate. `commander` authorizes network repairs and rollbacks; `viewer` reads
-saved evidence. All four local demo accounts use password `relay-demo`.
-See the [operator handoff guide](docs/operator-roles.md) and
-[presentation guide](docs/presentation-slice.md).
+**Current slice:** DNS failures and layered network recovery. A missing database
+hostname record can hide a firewall fault: repair DNS, verify, then investigate
+fresh evidence before the second repair. See the [DNS walkthrough](docs/dns-slice.md).
+
+Sign in as `presenter` to prepare scenarios, `responder` to investigate, and
+`commander` to authorize DNS, firewall and rollback repairs. All demo accounts
+(including read-only `viewer`) use password `relay-demo`.
+See [operator roles](docs/operator-roles.md) and [presentation](docs/presentation-slice.md).
 
 ## Run
 
@@ -176,7 +177,7 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 .\mvnw.cmd package
 ```
 
-The suite includes 43 deterministic tests and six opt-in live model tests.
+The suite includes 48 deterministic tests and seven opt-in live model tests.
 Remediation tests cover permissions, limits, stale state, cancellation, restart,
 concurrent advancement and one bounded correction attempt.
 Tests also cover all 16 original fault combinations plus 128 two-instance/load cases,

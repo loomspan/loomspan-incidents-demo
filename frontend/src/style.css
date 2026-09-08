@@ -481,7 +481,7 @@ header {
 }
 .environment-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   border-top: 1px solid #e9eeea;
   border-bottom: 1px solid #e9eeea;
 }

@@ -90,6 +90,18 @@ class LiveInvestigationTest {
         assertThat(store.world().demandRps()).isEqualTo(150);
         assertThat(store.activities(i.id())).filteredOn(a->a.kind().equals("VERIFICATION")).hasSize(2);
     }
+    @Test void dnsAndFirewallRecoveryRequiresTwoRealInvestigations() {
+        store.preset(new Preset("dns-compound",store.world().revision()));
+        Incident i=store.create(new NewIncident(null));
+        Operation op=store.startOperation(i.id(),new InvestigationOptions("AUTO",List.of("RESTORE_DB_DNS","RESTORE_DB_LINK"),2));
+        investigations.executeOperation(op.id());
+        assertThat(store.operation(op.id()).status()).withFailMessage("%s",store.detail(i.id())).isEqualTo("RESOLVED");
+        var runs=store.detail(i.id()).runs();assertThat(runs).hasSize(2);
+        assertThat(runs.get(1).report().recommendations()).extracting(Recommendation::actionId).containsExactly("RESTORE_DB_DNS");
+        assertThat(runs.get(0).report().recommendations()).extracting(Recommendation::actionId).containsExactly("RESTORE_DB_LINK");
+        assertThat(runs.get(1).snapshot().dnsHealthy()).isFalse();assertThat(runs.get(0).snapshot().dnsHealthy()).isTrue();
+        assertThat(store.operation(op.id()).repairs()).isEqualTo(2);
+    }
     @Test void correctionSkillRepairsInventedReferencesWithActualReceipts() {
         store.preset(new Preset("cache",store.world().revision()));
         Incident i=store.create(new NewIncident(null));Run r=store.begin(i.id());store.markRunning(r.id());

@@ -22,11 +22,11 @@ public class IncidentStore {
         if(db.query("select id from incident where id=? for update",(rs,n)->rs.getString(1),id).isEmpty()) throw ApiProblem.missing();
     }
     public World world() {
-        return db.queryForObject("select * from environment where id=1",(rs,n)->new World(rs.getInt("revision"),rs.getBoolean("checkout_running"),rs.getBoolean("database_running"),rs.getBoolean("link_allowed"),rs.getBoolean("bad_deploy"),rs.getBoolean("checkout_b_running"),rs.getInt("demand_rps"),rs.getBoolean("cache_running"),rs.getInt("cache_hit_percent")));
+        return db.queryForObject("select * from environment where id=1",(rs,n)->new World(rs.getInt("revision"),rs.getBoolean("checkout_running"),rs.getBoolean("database_running"),rs.getBoolean("link_allowed"),rs.getBoolean("bad_deploy"),rs.getBoolean("checkout_b_running"),rs.getInt("demand_rps"),rs.getBoolean("cache_running"),rs.getInt("cache_hit_percent"),rs.getBoolean("dns_healthy")));
     }
     private void saveWorld(World w) {
-        db.update("update environment set revision=?,checkout_running=?,database_running=?,link_allowed=?,bad_deploy=?,checkout_b_running=?,demand_rps=?,cache_running=?,cache_hit_percent=? where id=1",
-            w.revision(),w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent());
+        db.update("update environment set revision=?,checkout_running=?,database_running=?,link_allowed=?,bad_deploy=?,checkout_b_running=?,demand_rps=?,cache_running=?,cache_hit_percent=?,dns_healthy=? where id=1",
+            w.revision(),w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),Simulation.dnsWorks(w));
     }
     private void expected(World w,int revision) {
         if(w.revision()!=revision) throw ApiProblem.conflict("The environment changed. Refresh and investigate its current state before applying this action.");
@@ -41,11 +41,12 @@ public class IncidentStore {
         if(c.enabled()==null || c.expectedRevision()==null) throw ApiProblem.bad("Control value and expectedRevision are required.");
         lockWorld(); World w=world(); expected(w,c.expectedRevision());
         World next=switch(c.control()==null?"":c.control()) {
-            case "checkout" -> new World(w.revision()+1,c.enabled(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent());
-            case "checkoutB" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),c.enabled(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent());
-            case "database" -> new World(w.revision()+1,w.checkoutRunning(),c.enabled(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent());
-            case "link" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),c.enabled(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent());
-            case "deployment" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),c.enabled(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent());
+            case "dns" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),c.enabled());
+            case "checkout" -> new World(w.revision()+1,c.enabled(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),w.dnsHealthy());
+            case "checkoutB" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),c.enabled(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),w.dnsHealthy());
+            case "database" -> new World(w.revision()+1,w.checkoutRunning(),c.enabled(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),w.dnsHealthy());
+            case "link" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),c.enabled(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),w.dnsHealthy());
+            case "deployment" -> new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),c.enabled(),w.checkoutBRunning(),w.demandRps(),w.cacheRunning(),w.cacheHitPercent(),w.dnsHealthy());
             default -> throw ApiProblem.bad("Unknown environment control.");
         };
         saveWorld(next); activity(null,"CONTROL",c.control()+" changed to "+(c.enabled()?"enabled":"disabled"),next.revision()); return next;
@@ -55,15 +56,17 @@ public class IncidentStore {
         if(p.expectedRevision()==null) throw ApiProblem.bad("expectedRevision is required.");
         lockWorld(); World w=world(); expected(w,p.expectedRevision());
         World next=switch(p.name()==null?"":p.name()) {
-            case "healthy" -> new World(w.revision()+1,true,true,true,false,true,60,true,90);
-            case "connection" -> new World(w.revision()+1,true,true,false,false,true,60,true,90);
-            case "deployment" -> new World(w.revision()+1,true,true,true,true,true,60,true,90);
-            case "compound" -> new World(w.revision()+1,true,true,false,true,true,60,true,90);
-            case "redundancy" -> new World(w.revision()+1,true,true,true,false,false,60,true,90);
-            case "cache" -> new World(w.revision()+1,true,true,true,false,true,150,false,90);
-            case "cache-compound" -> new World(w.revision()+1,true,true,true,false,true,150,false,20);
-            case "cache-degraded" -> new World(w.revision()+1,true,true,true,false,true,150,true,20);
-            case "overload" -> new World(w.revision()+1,true,true,true,false,false,150,true,90);
+            case "dns" -> new World(w.revision()+1,true,true,true,false,true,60,true,90,false);
+            case "dns-compound" -> new World(w.revision()+1,true,true,false,false,true,60,true,90,false);
+            case "healthy" -> new World(w.revision()+1,true,true,true,false,true,60,true,90,true);
+            case "connection" -> new World(w.revision()+1,true,true,false,false,true,60,true,90,true);
+            case "deployment" -> new World(w.revision()+1,true,true,true,true,true,60,true,90,true);
+            case "compound" -> new World(w.revision()+1,true,true,false,true,true,60,true,90,true);
+            case "redundancy" -> new World(w.revision()+1,true,true,true,false,false,60,true,90,true);
+            case "cache" -> new World(w.revision()+1,true,true,true,false,true,150,false,90,true);
+            case "cache-compound" -> new World(w.revision()+1,true,true,true,false,true,150,false,20,true);
+            case "cache-degraded" -> new World(w.revision()+1,true,true,true,false,true,150,true,20,true);
+            case "overload" -> new World(w.revision()+1,true,true,true,false,false,150,true,90,true);
             default -> throw ApiProblem.bad("Unknown preset.");
         };
         saveWorld(next); activity(null,"PRESET","Applied environment preset: "+p.name(),next.revision()); return next;
@@ -73,7 +76,7 @@ public class IncidentStore {
         if(t.demandRps()==null || t.demandRps()<1 || t.demandRps()>400 || t.expectedRevision()==null)
             throw ApiProblem.bad("Traffic must be between 1 and 400 requests/s and expectedRevision is required.");
         lockWorld(); World w=world(); expected(w,t.expectedRevision());
-        World next=new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),t.demandRps(),w.cacheRunning(),w.cacheHitPercent());
+        World next=new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),t.demandRps(),w.cacheRunning(),w.cacheHitPercent(),w.dnsHealthy());
         saveWorld(next);activity(null,"TRAFFIC","Incoming checkout demand set to "+t.demandRps()+" requests/s.",next.revision());return next;
     }
     @Transactional
@@ -81,7 +84,7 @@ public class IncidentStore {
         if(c.running()==null || c.hitPercent()==null || c.hitPercent()<0 || c.hitPercent()>100 || c.expectedRevision()==null)
             throw ApiProblem.bad("Cache running, hitPercent from 0 to 100, and expectedRevision are required.");
         lockWorld(); World w=world(); expected(w,c.expectedRevision());
-        World next=new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),c.running(),c.hitPercent());
+        World next=new World(w.revision()+1,w.checkoutRunning(),w.databaseRunning(),w.linkAllowed(),w.badDeploy(),w.checkoutBRunning(),w.demandRps(),c.running(),c.hitPercent(),w.dnsHealthy());
         saveWorld(next);activity(null,"CACHE","Cache "+(c.running()?"online":"offline")+"; configured hit rate "+c.hitPercent()+"%.",next.revision());return next;
     }
     public List<Incident> incidents() {
@@ -222,7 +225,7 @@ public class IncidentStore {
         for(String id:ids) fail(id,"The application stopped during this investigation. Retry to capture a fresh snapshot.",null,List.of());
     }
 
-    public static final Set<String> REPAIR_ACTIONS=Set.of("START_CHECKOUT_A","START_CHECKOUT_B","START_DATABASE","RESTORE_DB_LINK","ROLLBACK_CHECKOUT","START_CACHE","RESTORE_CACHE_HIT_RATE");
+    public static final Set<String> REPAIR_ACTIONS=Set.of("START_CHECKOUT_A","START_CHECKOUT_B","START_DATABASE","RESTORE_DB_DNS","RESTORE_DB_LINK","ROLLBACK_CHECKOUT","START_CACHE","RESTORE_CACHE_HIT_RATE");
     private void idle(String incidentId) {
         if(db.queryForObject("select count(*) from operation where incident_id=? and status='ACTIVE'",Integer.class,incidentId)>0)
             throw ApiProblem.conflict("An operation is active. Stop it before starting manual work.");
