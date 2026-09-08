@@ -1,5 +1,24 @@
 # Verification record
 
+## Guided presentation — 2026-09-07
+
+- **36 deterministic tests passed**; six opt-in live tests were skipped in this
+  run (`target/presentation-tests.log`). New tests cover immutable opening/repair/
+  verification measurements, exact investigation links, and V4-to-V5 migration
+  without fabricated historical measurements.
+- Frontend type checking and production packaging passed. Desktop guide, timeline
+  and expandable evidence layouts were visually inspected.
+- The browser prepared the flagship scenario without starting model calls, then
+  completed live automatic recovery with both repairs and the intervening failed
+  verification displayed in the timeline.
+- Changing cache power afterward altered live checkout while the saved recovery
+  comparison stayed fixed and identified the newer environment revision.
+- A one-repair browser run stopped at the limit with a failed verification,
+  partial metrics and an explicit explanation requiring fresh investigation.
+- V5 preserved the world and all four existing incident histories. Before/after
+  comparisons are in target; backup: `data/relay-before-presentation.mv.db`.
+- Mobile layout has responsive rules but was not device-tested.
+
 ## Bounded automatic remediation — 2026-09-07
 
 - Full suite: **40 passed**, comprising 34 deterministic tests and six live model

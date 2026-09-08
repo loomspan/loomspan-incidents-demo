@@ -111,4 +111,33 @@ class RemediationTest {
         assertThat(store.operation(op.id()).status()).isEqualTo("FAILED");assertThat(store.world()).isEqualTo(before);
         verify(skills,times(1)).invoke(eq("correctIncidentReport"),anyMap(),any());
     }
+    @Test void savedMeasurementsAndRunLinksSurviveLaterEnvironmentChanges() {
+        Operation op=start("AUTO",List.of("START_CACHE","RESTORE_CACHE_HIT_RATE"),2);
+        diagnose(op.currentRunId());String next=store.advanceOperation(op.id());diagnose(next);store.advanceOperation(op.id());
+        var records=store.activities(op.incidentId());
+        Activity opening=records.stream().filter(a->a.kind().equals("OPENED")).findFirst().orElseThrow();
+        var checks=records.stream().filter(a->a.kind().equals("VERIFICATION")).toList();
+        assertThat(opening.measurement().dataLoad().databaseDemandOps()).isEqualTo(300);
+        assertThat(checks.get(1).measurement().dataLoad().databaseDemandOps()).isEqualTo(270);
+        assertThat(checks.get(1).measurement().checkout().success()).isFalse();
+        assertThat(checks.get(1).runId()).isEqualTo(op.currentRunId());
+        assertThat(checks.getFirst().measurement().dataLoad().databaseDemandOps()).isEqualTo(165);
+        assertThat(checks.getFirst().measurement().checkout().success()).isTrue();
+        assertThat(checks.getFirst().runId()).isEqualTo(next);
+        store.traffic(new Traffic(400,store.world().revision()));
+        assertThat(store.activities(op.incidentId())).isEqualTo(records);
+        assertThat(store.run(op.currentRunId()).measurement().capacity().successfulRps()).isEqualTo(100);
+        assertThat(store.state().checkout().success()).isFalse();
+    }
+    @Test void v5DoesNotInventMeasurementsForEarlierVerificationRecords() {
+        var source=new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:presentation-upgrade-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa","");
+        org.flywaydb.core.Flyway.configure().dataSource(source).target("4").load().migrate();
+        var old=new JdbcTemplate(source);
+        old.update("insert into incident values ('earlier','Earlier incident','RESOLVED','2026-09-07T00:00:00Z',null)");
+        old.update("insert into activity(incident_id,created_at,kind,message,revision) values ('earlier','2026-09-07T00:00:00Z','VERIFICATION','Recovery verified.',7)");
+        org.flywaydb.core.Flyway.configure().dataSource(source).load().migrate();
+        Activity a=new IncidentStore(old,json).activities("earlier").getFirst();
+        assertThat(a.message()).isEqualTo("Recovery verified.");assertThat(a.revision()).isEqualTo(7);
+        assertThat(a.measurement()).isNull();assertThat(a.runId()).isNull();
+    }
 }

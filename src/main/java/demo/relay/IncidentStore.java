@@ -32,7 +32,9 @@ public class IncidentStore {
         if(w.revision()!=revision) throw ApiProblem.conflict("The environment changed. Refresh and investigate its current state before applying this action.");
     }
     private void activity(String incident,String kind,String message,int revision) {
-        db.update("insert into activity(incident_id,created_at,kind,message,revision) values (?,?,?,?,?)",incident,now(),kind,message,revision);
+        String runId=incident==null?null:incident(incident).lastRunId();
+        Measurement measurement=Set.of("OPENED","REPAIR","VERIFICATION").contains(kind)?Simulation.measurement(world()):null;
+        db.update("insert into activity(incident_id,created_at,kind,message,revision,run_id,measurement_json) values (?,?,?,?,?,?,?)",incident,now(),kind,message,revision,runId,measurement==null?null:encode(measurement));
     }
     @Transactional
     public World control(Control c) {
@@ -101,13 +103,13 @@ public class IncidentStore {
         return db.query("select receipt_json from evidence where run_id=? order by created_at,id",(rs,n)->decode(rs.getString(1),Receipt.class),runId);
     }
     public Run run(String id) {
-        var rows=db.query("select investigation.*,coalesce(operation.mode,'RECOMMEND') as execution_mode from investigation left join operation on operation.id=investigation.operation_id where investigation.id=?",(rs,n)->new Run(rs.getString("id"),rs.getString("incident_id"),rs.getString("status"),rs.getString("created_at"),decode(rs.getString("snapshot_json"),World.class),decode(rs.getString("report_json"),Report.class),rs.getString("session_id"),List.of(decode(rs.getString("events_json"),ExecutionEvent[].class)),rs.getString("error_message"),receipts(id),rs.getString("execution_mode"),decode(rs.getString("correction_json"),Correction.class)),id);
+        var rows=db.query("select investigation.*,coalesce(operation.mode,'RECOMMEND') as execution_mode from investigation left join operation on operation.id=investigation.operation_id where investigation.id=?",(rs,n)->new Run(rs.getString("id"),rs.getString("incident_id"),rs.getString("status"),rs.getString("created_at"),decode(rs.getString("snapshot_json"),World.class),decode(rs.getString("report_json"),Report.class),rs.getString("session_id"),List.of(decode(rs.getString("events_json"),ExecutionEvent[].class)),rs.getString("error_message"),receipts(id),rs.getString("execution_mode"),decode(rs.getString("correction_json"),Correction.class),Simulation.measurement(decode(rs.getString("snapshot_json"),World.class))),id);
         if(rows.isEmpty()) throw ApiProblem.missing(); return rows.getFirst();
     }
     public List<Activity> activities(String incidentId) {
         String clause=incidentId==null?"":" where incident_id=?";
         Object[] args=incidentId==null?new Object[]{}:new Object[]{incidentId};
-        return db.query("select * from activity"+clause+" order by id desc limit 100",(rs,n)->new Activity(rs.getLong("id"),rs.getString("incident_id"),rs.getString("created_at"),rs.getString("kind"),rs.getString("message"),rs.getInt("revision")),args);
+        return db.query("select * from activity"+clause+" order by id desc limit 100",(rs,n)->new Activity(rs.getLong("id"),rs.getString("incident_id"),rs.getString("created_at"),rs.getString("kind"),rs.getString("message"),rs.getInt("revision"),rs.getString("run_id"),decode(rs.getString("measurement_json"),Measurement.class)),args);
     }
     public Detail detail(String id) {
         Incident i=incident(id);

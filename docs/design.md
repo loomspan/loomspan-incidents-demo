@@ -13,6 +13,8 @@ saved evidence, supported repair proposals, verified resolution and historical r
 See [cache rules](cache-slice.md) for cascading database load and [capacity rules](capacity-slice.md) for the new behavior and migration contract.
 
 See [remediation rules](remediation-slice.md) for operating modes, correction and the bounded loop.
+See [presentation notes](presentation-slice.md) for guided scenarios, saved comparisons
+and the activity-based recovery timeline.
 
 ## Ownership
 

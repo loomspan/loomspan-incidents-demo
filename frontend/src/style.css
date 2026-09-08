@@ -1675,3 +1675,266 @@ footer {
   padding: 20px;
   border-top: 1px solid #dce5dc;
 }
+
+.scenario-guide,
+.recovery-comparison {
+  background: #fff;
+  border: 1px solid #dfe7e1;
+  border-radius: 14px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.scenario-guide {
+  background: linear-gradient(120deg, #edf5ef, #fff 75%);
+}
+.guide-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 26px 16px;
+}
+.guide-heading h2 {
+  font-size: 24px;
+  margin: 6px 0;
+}
+.guide-heading p,
+.guide-body p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #58706a;
+}
+.guide-heading label {
+  display: grid;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.guide-heading select {
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  background: white;
+  padding: 10px;
+  border: 1px solid #ccdcd0;
+  border-radius: 7px;
+  max-width: 100%;
+}
+.guide-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  padding: 0 26px 20px;
+}
+.guide-body h3 {
+  margin: 10px 0;
+  font-size: 18px;
+}
+.guide-tag {
+  display: inline-block;
+  color: #346751;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.guide-body > div:last-child {
+  border-left: 1px solid #d4e2d7;
+  padding-left: 24px;
+}
+.guide-body strong {
+  font-size: 13px;
+}
+.guide-body details {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.guide-body summary,
+.recovery-story summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.guide-body li {
+  padding: 4px 0;
+}
+.guide-footer {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 26px;
+  border-top: 1px solid #dce7dd;
+}
+.guide-footer > span {
+  font-size: 11px;
+  color: #62786f;
+  line-height: 1.6;
+}
+.comparison-scroll {
+  overflow-x: auto;
+  padding: 0 24px;
+}
+.recovery-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.recovery-comparison th,
+.recovery-comparison td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #edf0ed;
+}
+.recovery-comparison thead th {
+  background: #f3f7f3;
+  font-size: 12px;
+}
+.recovery-comparison th small {
+  display: block;
+  color: #6f8179;
+  font-weight: 400;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.recovery-comparison tbody th {
+  font-weight: 500;
+  color: #65796f;
+}
+.recovery-comparison td {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.comparison-note {
+  margin: 14px 26px 20px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #6d7f76;
+}
+.outcome-badge {
+  font-size: 11px;
+  color: #926542;
+  background: #fff1e3;
+  padding: 8px 12px;
+  border-radius: 20px;
+}
+.outcome-badge.passed {
+  color: #366d53;
+  background: #eaf5ed;
+}
+.stop-explanation {
+  border-top: 1px solid #d7dfd5;
+  padding-top: 14px;
+  margin-top: 12px;
+}
+.stop-explanation > strong {
+  color: #986139;
+}
+.recovery-story {
+  padding: 18px 24px;
+}
+.recovery-story > ol {
+  padding: 0;
+  margin: 22px 0;
+  list-style: none;
+}
+.recovery-story > ol > li {
+  position: relative;
+  margin-left: 7px;
+  padding: 0 0 26px 23px;
+  border-left: 2px solid #dce6de;
+}
+.recovery-story > ol > li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+.story-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8aab99;
+  border: 3px solid white;
+  left: -7px;
+  top: 2px;
+}
+.step-passed .story-dot {
+  background: #31815c;
+}
+.step-failed .story-dot {
+  background: #bf8152;
+}
+.recovery-story h3 {
+  font-size: 14px;
+  margin: 7px 0;
+}
+.recovery-story p {
+  font-size: 12px;
+  color: #61756b;
+  line-height: 1.65;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.recovery-story small {
+  font-size: 10px;
+  color: #7f9087;
+  line-height: 1.5;
+}
+.step-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+.step-metrics span {
+  font-size: 10px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  background: #f1f6f1;
+}
+.recovery-story details {
+  font-size: 11px;
+  margin-top: 12px;
+}
+.story-receipt {
+  background: #f6f8f5;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 6px;
+}
+.story-receipt strong {
+  font-size: 11px;
+}
+#incident-workspace {
+  scroll-margin-top: 20px;
+}
+@media (max-width: 700px) {
+  .guide-heading,
+  .guide-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .guide-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .guide-body > div:last-child {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid #d4e2d7;
+    padding-top: 16px;
+  }
+  .comparison-scroll {
+    padding: 0 10px;
+  }
+  .recovery-comparison th,
+  .recovery-comparison td {
+    padding: 10px 7px;
+    min-width: 110px;
+  }
+  .recovery-story {
+    padding: 16px;
+  }
+  .recovery-comparison .section-head {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

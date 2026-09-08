@@ -10,6 +10,13 @@ import type {
   Recovery,
 } from "./types";
 import "./style.css";
+import {
+  ScenarioGuide,
+  RecoveryComparison,
+  RecoveryTimeline,
+  OperationExplanation,
+  scenarios,
+} from "./presentation";
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(
@@ -69,6 +76,7 @@ const repairChoices = [
   ["ROLLBACK_CHECKOUT", "Roll back checkout"],
 ];
 function App() {
+  const [guide, setGuide] = useState("cache-compound");
   const [mode, setMode] = useState("RECOMMEND");
   const [allowedActions, setAllowedActions] = useState([
     "START_CACHE",
@@ -82,9 +90,9 @@ function App() {
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const [title, setTitle] = useState(""),
-    [tab, setTab] = useState<"evidence" | "coordination" | "history">(
-      "evidence",
-    );
+    [tab, setTab] = useState<
+      "timeline" | "evidence" | "coordination" | "history"
+    >("timeline");
   const selectedRef = useRef<string | null>(null);
   async function refresh() {
     const next = await api<State>("/state");
@@ -117,7 +125,7 @@ function App() {
     selectedRef.current = id;
     setSelected(id);
     setDetail(null);
-    setTab("evidence");
+    setTab("timeline");
     void refresh().catch((e) => setError(e.message));
   }
   async function act(fn: () => Promise<unknown>) {
@@ -185,6 +193,27 @@ function App() {
         expectedRevision: w.revision,
       }),
     );
+  }
+  async function prepareWalkthrough() {
+    await act(async () => {
+      const scenario = scenarios.find((s) => s.id === guide)!;
+      await api("/environment/preset", {
+        name: scenario.id,
+        expectedRevision: w.revision,
+      });
+      const i = await api<Incident>("/incidents", { title: null });
+      setMode(scenario.mode);
+      setAllowedActions(["START_CACHE", "RESTORE_CACHE_HIT_RATE"]);
+      setMaxRepairs(2);
+      select(i.id);
+      setTitle("");
+      setNotice(
+        `${scenario.title} is ready. Review the operating mode, then start the investigation.`,
+      );
+      document
+        .getElementById("incident-workspace")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
   async function openIncident() {
     await act(async () => {
@@ -311,6 +340,12 @@ function App() {
               </button>
             </div>
           )}
+          <ScenarioGuide
+            selected={guide}
+            onSelect={setGuide}
+            onPrepare={() => void prepareWalkthrough()}
+            disabled={busy || running}
+          />
           <section className="system-panel">
             <div className="section-head">
               <div>
@@ -665,7 +700,8 @@ function App() {
               </button>
             </div>
           </section>
-          <div className="work-grid">
+          {detail && <RecoveryComparison detail={detail} state={state} />}
+          <div className="work-grid" id="incident-workspace">
             <section className="investigation-panel">
               <div className="section-head">
                 <div>
@@ -833,6 +869,7 @@ function App() {
                         · {statusText(operation.status)}
                       </strong>
                       <p>{operation.message}</p>
+                      <OperationExplanation operation={operation} />
                       {operation.mode === "AUTO" && (
                         <p>
                           {operation.repairs} / {operation.maxRepairs} repairs
@@ -1013,7 +1050,9 @@ function App() {
                 role="tablist"
                 aria-label="Investigation records"
               >
-                {(["evidence", "coordination", "history"] as const).map((t) => (
+                {(
+                  ["timeline", "evidence", "coordination", "history"] as const
+                ).map((t) => (
                   <button
                     role="tab"
                     aria-selected={tab === t}
@@ -1072,6 +1111,7 @@ function App() {
                   )}
                 </>
               )}
+              {tab === "timeline" && <RecoveryTimeline detail={detail} />}
               {tab === "history" && (
                 <div className="activity-list">
                   {(detail?.activity || state.activity).length ? (

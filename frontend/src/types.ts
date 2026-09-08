@@ -66,6 +66,7 @@ export type Run = {
   }[];
   error: string | null;
   evidence: Receipt[];
+  measurement: Measurement;
   mode: "OBSERVE" | "RECOMMEND" | "AUTO";
   correction: {
     status: string;
@@ -88,6 +89,8 @@ export type Activity = {
   kind: string;
   message: string;
   revision: number;
+  runId: string | null;
+  measurement: Measurement | null;
 };
 export type Operation = {
   id: string;
@@ -121,4 +124,10 @@ export type State = {
   };
   incidents: Incident[];
   activity: Activity[];
+};
+
+export type Measurement = {
+  checkout: Check;
+  capacity: Capacity;
+  dataLoad: State["dataLoad"];
 };

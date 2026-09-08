@@ -8,6 +8,7 @@ import static demo.relay.Contracts.*;
 public final class Simulation {
     public static final int INSTANCE_CAPACITY = 100;
     private Simulation() {}
+    public static Measurement measurement(World w) { return new Measurement(checkout(w),capacity(w),dataLoad(w)); }
 
     public static DataLoad dataLoad(World w) {
         boolean modeled=w.cacheRunning()!=null;

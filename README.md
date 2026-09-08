@@ -5,10 +5,11 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
-**Current slice:** Observe, Recommend and Auto-repair modes with saved repair
-permissions, bounded report correction, and verified automatic reassessment.
-Try [two-stage cache recovery](docs/remediation-slice.md). Existing incident history
-and all earlier failure scenarios remain available.
+**Current slice:** guided scenarios, a recovery timeline with linked evidence,
+saved before-and-after measurements, and clear explanations when automatic work stops.
+Start with **Prepare walkthrough** for two-stage cache recovery, then review the mode
+and start the investigation. See the [presentation guide](docs/presentation-slice.md).
+Observe, Recommend and Auto-repair modes and existing incident history remain available.
 
 ## Run
 
@@ -169,7 +170,7 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 .\mvnw.cmd package
 ```
 
-The suite includes 34 deterministic tests and six opt-in live model tests.
+The suite includes 36 deterministic tests and six opt-in live model tests.
 Remediation tests cover permissions, limits, stale state, cancellation, restart,
 concurrent advancement and one bounded correction attempt.
 Tests also cover all 16 original fault combinations plus 128 two-instance/load cases,

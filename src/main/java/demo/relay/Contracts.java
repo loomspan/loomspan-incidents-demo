@@ -40,11 +40,13 @@ public final class Contracts {
     public record Report(String summary, String likelyCause, String confidence,
                          List<String> evidenceIds, List<Recommendation> recommendations, String nextStep) {}
     public record ExecutionEvent(String timestamp, String type, String frameId, String route) {}
+    public record Measurement(TransactionResult checkout, Capacity capacity, DataLoad dataLoad) {}
     public record Run(String id, String incidentId, String status, String createdAt, World snapshot,
                       Report report, String sessionId, List<ExecutionEvent> events, String error,
-                      List<Receipt> evidence, String mode, Correction correction) {}
+                      List<Receipt> evidence, String mode, Correction correction, Measurement measurement) {}
     public record Incident(String id, String title, String status, String createdAt, String lastRunId) {}
-    public record Activity(long id, String incidentId, String createdAt, String kind, String message, int revision) {}
+    public record Activity(long id, String incidentId, String createdAt, String kind, String message, int revision,
+                           String runId, Measurement measurement) {}
     public record Detail(Incident incident, List<Run> runs, List<Activity> activity, List<Operation> operations) {}
     public record State(World environment, TransactionResult checkout, Capacity capacity, DataLoad dataLoad, List<Incident> incidents, List<Activity> activity) {}
 }
