@@ -9,7 +9,8 @@ prompt: |
   Copy each evidence ID verbatim from a receipt's id. For a recommendation copy the
   action id from that receipt's actions array and the same enclosing receipt id.
   A receipt with no actions cannot support a repair. Include each cited action's
-  receipt in evidenceIds. Return an empty recommendations array when unsupported.
+  receipt in evidenceIds. When receipts offer supported repairs, include at least
+  one useful repair from those actions. Return an empty array only when none are offered.
   Preserve supported diagnosis, explain uncertainty, and never claim a repair occurred.
   You have one correction attempt; return only a report matching the output schema.
 input_schema:

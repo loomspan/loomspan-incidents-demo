@@ -66,6 +66,13 @@ export type Run = {
   }[];
   error: string | null;
   evidence: Receipt[];
+  mode: "OBSERVE" | "RECOMMEND" | "AUTO";
+  correction: {
+    status: string;
+    reason: string;
+    sessionId: string | null;
+    events: Run["events"];
+  } | null;
 };
 export type Incident = {
   id: string;
@@ -82,7 +89,23 @@ export type Activity = {
   message: string;
   revision: number;
 };
-export type Detail = { incident: Incident; runs: Run[]; activity: Activity[] };
+export type Operation = {
+  id: string;
+  mode: string;
+  allowedActions: string[];
+  maxRepairs: number;
+  repairs: number;
+  status: string;
+  message: string;
+  currentRunId: string;
+  expectedRevision: number;
+};
+export type Detail = {
+  incident: Incident;
+  runs: Run[];
+  activity: Activity[];
+  operations: Operation[];
+};
 export type State = {
   environment: World;
   checkout: Check;

@@ -1,4 +1,4 @@
-name: investigateIncident
+name: investigateIncidentLoad
 description: Coordinate selective application, capacity, network and database specialists to distinguish outages, saturation and redundancy risks and propose evidence-supported repairs.
 model: investigator
 planning_mode: true
@@ -6,12 +6,15 @@ concurrency: true
 max_steps: 7
 allowed_skills:
   - name: investigateApplication
+    min_tasks: 1
     max_tasks: 1
   - name: investigateNetwork
     max_tasks: 1
   - name: investigateDatabase
+    min_tasks: 1
     max_tasks: 1
   - name: investigateCapacity
+    min_tasks: 1
     max_tasks: 1
   - name: readInvestigationEvidence
     min_tasks: 1

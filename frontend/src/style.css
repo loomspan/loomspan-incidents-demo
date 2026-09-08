@@ -1621,3 +1621,57 @@ footer {
     transition: none !important;
   }
 }
+
+.remediation-policy {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid #dce5dc;
+  border-radius: 10px;
+  background: #f7faf6;
+}
+.remediation-policy > label {
+  display: block;
+  font-weight: 600;
+  margin: 8px 0;
+}
+.remediation-policy select {
+  max-width: 100%;
+  font: inherit;
+  padding: 8px;
+  background: white;
+  color: inherit;
+  border: 1px solid #d3dfcf;
+  border-radius: 5px;
+}
+.remediation-policy p,
+.operation-summary p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.remediation-policy fieldset {
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+}
+.remediation-policy legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.remediation-policy fieldset label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.operation-summary {
+  margin: 16px 24px;
+  padding: 16px;
+  border-left: 3px solid #639581;
+  background: #f4f8f4;
+}
+.correction-record {
+  padding: 20px;
+  border-top: 1px solid #dce5dc;
+}

@@ -20,13 +20,7 @@ class LiveInvestigationTest {
     @Autowired SkillTemplate skills;
     @Autowired ObjectMapper json;
     private Run investigate(String incidentId) {
-        Run r=store.begin(incidentId);store.markRunning(r.id());
-        var views=new ArrayList<ai.loomspan.api.SkillExecutionView>();
-        String result=skills.invoke("investigateIncident",Map.of("runId",r.id(),"ticket",store.incident(incidentId).title(),"symptom",Simulation.symptom(r.snapshot())),views::add);
-        var view=views.getFirst();
-        try {
-            store.complete(r.id(),json.readValue(result,Report.class),view.sessionId(),view.events().stream().filter(e->Set.of("SKILL_STARTED","SKILL_FINISHED").contains(e.type())).map(e->new ExecutionEvent(e.timestamp().toString(),e.type(),e.frameId(),e.route())).toList());
-        } catch(RuntimeException e) { throw new AssertionError("Rejected model report: "+result+"; receipts="+store.receipts(r.id()),e); }
+        Run r=store.begin(incidentId);investigations.execute(r.id());
         r=store.run(r.id());
         assertThat(r.status()).withFailMessage("%s: %s",r.status(),r.error()).isEqualTo("COMPLETE");
         assertThat(r.sessionId()).isNotBlank();
@@ -82,5 +76,27 @@ class LiveInvestigationTest {
             assertThat(store.state().dataLoad().databaseDemandOps()).isEqualTo(165);
             assertThat(store.verify(i.id()).success()).isTrue();
         }
+    }
+    @Test void automaticTwoStageCacheRecoveryUsesSavedPolicyAndFreshEvidence() {
+        store.preset(new Preset("cache-compound",store.world().revision()));
+        Incident i=store.create(new NewIncident(null));
+        Operation op=store.startOperation(i.id(),new InvestigationOptions("AUTO",List.of("START_CACHE","RESTORE_CACHE_HIT_RATE"),2));
+        investigations.executeOperation(op.id());
+        assertThat(store.operation(op.id()).status()).withFailMessage("%s",store.detail(i.id())).isEqualTo("RESOLVED");
+        assertThat(store.operation(op.id()).repairs()).isEqualTo(2);
+        assertThat(store.detail(i.id()).runs()).hasSize(2);
+        assertThat(store.world().demandRps()).isEqualTo(150);
+        assertThat(store.activities(i.id())).filteredOn(a->a.kind().equals("VERIFICATION")).hasSize(2);
+    }
+    @Test void correctionSkillRepairsInventedReferencesWithActualReceipts() {
+        store.preset(new Preset("cache",store.world().revision()));
+        Incident i=store.create(new NewIncident(null));Run r=store.begin(i.id());store.markRunning(r.id());
+        Receipt receipt=store.probe(r.id(),"inspectDatabase");
+        String candidate=json.writeValueAsString(new Report("Cache offline","Cache offline","high",List.of("invented"),List.of(new Recommendation("START_CACHE","invented","Cache is stopped")),"Start cache then verify."));
+        var views=new ArrayList<ai.loomspan.api.SkillExecutionView>();
+        String value=skills.invoke("correctIncidentReport",Map.of("candidate",candidate,"receipts",json.writeValueAsString(List.of(receipt)),"validationError","The report cites evidence outside this investigation."),views::add);
+        Report corrected=json.readValue(value,Report.class);IncidentStore.validate(corrected,List.of(receipt));
+        assertThat(corrected.recommendations()).extracting(Recommendation::actionId).containsExactly("START_CACHE");
+        assertThat(views).hasSize(1);store.fail(r.id(),"Correction skill test finished",null,List.of());
     }
 }

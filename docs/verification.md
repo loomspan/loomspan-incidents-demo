@@ -1,5 +1,28 @@
 # Verification record
 
+## Bounded automatic remediation — 2026-09-07
+
+- Full suite: **40 passed**, comprising 34 deterministic tests and six live model
+  tests (`target/auto-all-verified.log`). Frontend type checking, production build
+  and runnable packaging passed (`target/auto-package.log`).
+- Deterministic coverage includes two-stage repair, Observe enforcement, Recommend
+  waiting for the operator, permissions, limits, stale worlds, manual-work fencing,
+  duplicate starts, concurrent advancement, operator stop, restart, accepted
+  correction and a second invalid report stopping automatic work without mutation.
+- Live coverage includes the original scenarios, two-stage automatic cache recovery
+  and the tool-free correction skill with deliberately invented receipt references.
+- Initial live regressions prompted explicit minimum specialist counts for the
+  load planner and a report completeness check when probes offer repairs. The
+  final complete suite passed with both enforced contracts.
+- The browser completed the two-stage scenario without intervention: start cache,
+  failed verification, fresh investigation, restore hit rate, successful verification.
+  History displayed the policy, both proposals/repairs and adaptation. Reload showed
+  the saved Auto-repair policy, selected cache permissions and 2/2 repair count.
+- V4 preserved the environment and all three existing incidents, including reports,
+  evidence, events and history. Before/after comparisons are in target; the backup
+  is `data/relay-before-remediation.mv.db`.
+- Desktop policy/progress layout was visually checked. Mobile was not device-tested.
+
 ## Cache and cascading database load — 2026-09-07
 
 - `cache-all-verified.log`: 28 tests passed: 24 deterministic integration tests

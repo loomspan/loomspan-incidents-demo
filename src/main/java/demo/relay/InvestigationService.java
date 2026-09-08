@@ -57,7 +57,9 @@ public class InvestigationService {
         var observed=new AtomicReference<List<ExecutionEvent>>(List.of());
         try {
             Run run=store.run(runId);
-            String result=skills.invoke("investigateIncident",Map.of("runId",runId,"ticket",store.incident(run.incidentId()).title(),"symptom",Simulation.symptom(run.snapshot())),view->{
+            String symptom=Simulation.symptom(run.snapshot());
+            String root=symptom.startsWith("Database operations saturated:")?"investigateIncidentLoad":"investigateIncident";
+            String result=skills.invoke(root,Map.of("runId",runId,"ticket",store.incident(run.incidentId()).title(),"symptom",symptom),view->{
                 session.set(view.sessionId());observed.set(events(view));
             });
             if(!store.run(runId).status().equals("RUNNING")) return;

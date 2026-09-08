@@ -5,10 +5,10 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
-**Current slice:** cache outages and degradation that cascade into database saturation,
-with application, capacity and database specialists correlating evidence. Includes
-two checkout instances, variable traffic, persistent incidents and verified recovery.
-See the [cache walkthrough and rules](docs/cache-slice.md).
+**Current slice:** Observe, Recommend and Auto-repair modes with saved repair
+permissions, bounded report correction, and verified automatic reassessment.
+Try [two-stage cache recovery](docs/remediation-slice.md). Existing incident history
+and all earlier failure scenarios remain available.
 
 ## Run
 
@@ -121,9 +121,11 @@ require successful specialist/probe execution; application validation separately
 checks that cited receipt IDs belong to the run and each recommended action is
 offered by its cited receipt. These checks do not prove model prose is correct.
 
-The model cannot mutate the environment. Repair buttons use deterministic
+The model cannot mutate the environment. Repair buttons and policy-controlled automatic operations use deterministic
 application services with exact action IDs, current-revision checks, latest-run
 checks, and idempotency. One repair is applied before verification/reassessment.
+Auto-repair uses an explicit saved allowlist and a maximum of three repairs.
+Invalid returned reports receive one bounded correction attempt against saved receipts.
 Recovery requires both a successful fresh customer batch and the instance
 availability target, not an LLM assertion.
 
@@ -167,7 +169,10 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 .\mvnw.cmd package
 ```
 
-Tests cover all 16 original fault combinations plus 128 two-instance/load cases,
+The suite includes 34 deterministic tests and six opt-in live model tests.
+Remediation tests cover permissions, limits, stale state, cancellation, restart,
+concurrent advancement and one bounded correction attempt.
+Tests also cover all 16 original fault combinations plus 128 two-instance/load cases,
 V1/V2 → V3 migrations, 707 cache/load combinations, independent cache repairs, redundancy versus outage, demand boundaries, capacity
 repair and no-remedy scenarios, blocked-path evidence, compound recovery,
 immutable snapshots, stale repair rejection, unsupported and cross-run receipts,

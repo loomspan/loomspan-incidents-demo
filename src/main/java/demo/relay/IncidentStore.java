@@ -160,6 +160,8 @@ public class IncidentStore {
             || report.evidenceIds()==null || report.evidenceIds().isEmpty() || report.recommendations()==null || report.recommendations().size()>4) throw ApiProblem.bad("The investigation returned an incomplete report.");
         Map<String,Receipt> byId=new HashMap<>(); receipts.forEach(r->byId.put(r.id(),r));
         if(report.evidenceIds().stream().anyMatch(id->!byId.containsKey(id))) throw ApiProblem.bad("The report cites evidence outside this investigation.");
+        if(report.recommendations().isEmpty() && receipts.stream().anyMatch(r->!r.actions().isEmpty()))
+            throw ApiProblem.bad("Recorded probes offer supported repairs. Include at least one useful supported repair with its exact receipt reference.");
         Set<String> actions=new HashSet<>();
         for(var recommendation:report.recommendations()) {
             if(recommendation==null || blank(recommendation.reason())) throw ApiProblem.bad("The repair needs a reason.");
@@ -231,7 +233,7 @@ public class IncidentStore {
     }
     @Transactional
     public Operation startOperation(String incidentId,InvestigationOptions input) {
-        String mode=input==null?"RECOMMEND":input.mode();
+        String mode=input==null||input.mode()==null?"RECOMMEND":input.mode();
         if(mode==null || !Set.of("OBSERVE","RECOMMEND","AUTO").contains(mode)) throw ApiProblem.bad("Choose OBSERVE, RECOMMEND or AUTO mode.");
         List<String> allowed=input==null||input.allowedActions()==null?List.of():input.allowedActions();
         int limit=input==null||input.maxRepairs()==null?2:input.maxRepairs();

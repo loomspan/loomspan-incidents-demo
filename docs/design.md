@@ -7,10 +7,12 @@ fictional storefront. The database is real; servers, network traffic, logs and
 transactions are simulated. A single Java dependency model gives all probes
 consistent observations without launching containers or touching real hosts.
 
-The current slice includes two checkout instances, cache power and hit rate, variable traffic, eight presets,
+The current slice includes two checkout instances, cache power and hit rate, variable traffic, nine presets,
 persistent incidents, asynchronous model investigation, four focused specialists,
 saved evidence, supported repair proposals, verified resolution and historical runs.
 See [cache rules](cache-slice.md) for cascading database load and [capacity rules](capacity-slice.md) for the new behavior and migration contract.
+
+See [remediation rules](remediation-slice.md) for operating modes, correction and the bounded loop.
 
 ## Ownership
 
@@ -60,7 +62,8 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
   and latency bands, not a queueing engine or historical metric generator.
   Deployment history is simulated and shared by the checkout pool.
 - Recovery checks are deterministic application operations; the model proposes
-  repairs but never executes them automatically.
+  repairs; the application executes them only through operator requests or an explicit
+  saved automatic repair policy.
 - Receipt IDs and allowed actions are validated; model explanations remain
   hypotheses. Confidence is model-reported, not a calibrated probability.
 - The embedded workflow displays successful public execution observations after
@@ -69,6 +72,6 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
 ## Candidate follow-on slices
 
 1. Additional path-specific failures such as DNS and region-specific connectivity.
-2. Role-constrained remediation and an explicitly enabled automatic repair policy.
+2. Authenticated operator roles building on the existing application repair policy.
 3. Controlled snapshot refresh during investigation, if the framework's supported
    mission semantics make that useful without hidden state propagation.

@@ -59,7 +59,22 @@ function Pill({
     </span>
   );
 }
+const repairChoices = [
+  ["START_CACHE", "Start cache service"],
+  ["RESTORE_CACHE_HIT_RATE", "Restore cache hit rate"],
+  ["START_CHECKOUT_A", "Start checkout A"],
+  ["START_CHECKOUT_B", "Start checkout B"],
+  ["START_DATABASE", "Start database"],
+  ["RESTORE_DB_LINK", "Restore database connection"],
+  ["ROLLBACK_CHECKOUT", "Roll back checkout"],
+];
 function App() {
+  const [mode, setMode] = useState("RECOMMEND");
+  const [allowedActions, setAllowedActions] = useState([
+    "START_CACHE",
+    "RESTORE_CACHE_HIT_RATE",
+  ]);
+  const [maxRepairs, setMaxRepairs] = useState(2);
   const [state, setState] = useState<State | null>(null),
     [detail, setDetail] = useState<Detail | null>(null);
   const [selected, setSelected] = useState<string | null>(null),
@@ -132,8 +147,18 @@ function App() {
     dataLoad = state.dataLoad,
     run = detail?.runs[0],
     incident = detail?.incident;
-  const running = incident?.status === "INVESTIGATING",
+  const operation = detail?.operations[0];
+  const running =
+      incident?.status === "INVESTIGATING" || operation?.status === "ACTIVE",
     resolved = incident?.status === "RESOLVED";
+  const policyMode =
+    running || resolved ? (operation?.mode ?? run?.mode ?? mode) : mode;
+  const policyActions =
+    running || resolved
+      ? (operation?.allowedActions ?? allowedActions)
+      : allowedActions;
+  const policyLimit =
+    running || resolved ? (operation?.maxRepairs ?? maxRepairs) : maxRepairs;
   const stale = !!run && run.snapshot.revision !== w.revision;
   const activeCount = state.incidents.filter(
     (i) => i.status !== "RESOLVED",
@@ -593,6 +618,7 @@ function App() {
                 ["overload", "Overloaded instance"],
                 ["cache", "Cache outage"],
                 ["cache-degraded", "Cache degradation"],
+                ["cache-compound", "Two-stage cache recovery"],
               ].map(([name, label]) => (
                 <button
                   disabled={busy}
@@ -688,19 +714,93 @@ function App() {
                       {time(incident.createdAt)}
                     </small>
                     <h3>{incident.title}</h3>
+                    <div className="remediation-policy">
+                      <label htmlFor="remediation-mode">Operating mode</label>
+                      <select
+                        id="remediation-mode"
+                        value={policyMode}
+                        disabled={busy || running || resolved}
+                        onChange={(e) => setMode(e.target.value)}
+                      >
+                        <option value="OBSERVE">Observe · diagnose only</option>
+                        <option value="RECOMMEND">
+                          Recommend · operator applies repairs
+                        </option>
+                        <option value="AUTO">
+                          Auto-repair · permitted actions only
+                        </option>
+                      </select>
+                      <p>
+                        {policyMode === "OBSERVE"
+                          ? "Collect evidence and explain the incident without authorizing repairs."
+                          : policyMode === "RECOMMEND"
+                            ? "Review the diagnosis and choose whether to apply each proposed repair."
+                            : "Apply one permitted repair, verify, and investigate again if needed. Stops on changed evidence, blocked repairs, invalid reports or the repair limit."}
+                      </p>
+                      {policyMode === "AUTO" && (
+                        <>
+                          <fieldset disabled={busy || running || resolved}>
+                            <legend>Permitted automatic repairs</legend>
+                            {repairChoices.map(([id, label]) => (
+                              <label key={id}>
+                                <input
+                                  type="checkbox"
+                                  checked={policyActions.includes(id)}
+                                  onChange={(e) =>
+                                    setAllowedActions(
+                                      e.target.checked
+                                        ? [...allowedActions, id]
+                                        : allowedActions.filter(
+                                            (a) => a !== id,
+                                          ),
+                                    )
+                                  }
+                                />
+                                {label}
+                              </label>
+                            ))}
+                          </fieldset>
+                          <label htmlFor="repair-limit">Maximum repairs</label>
+                          <select
+                            id="repair-limit"
+                            disabled={busy || running || resolved}
+                            value={policyLimit}
+                            onChange={(e) =>
+                              setMaxRepairs(Number(e.target.value))
+                            }
+                          >
+                            {[1, 2, 3].map((n) => (
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
+                            ))}
+                          </select>
+                          <p>
+                            Permissions and limit are saved when you start. Stop
+                            the operation to change them.
+                          </p>
+                        </>
+                      )}
+                    </div>
                     <div className="workflow-actions">
                       <button
                         className="primary"
                         disabled={busy || running || resolved}
                         onClick={() =>
                           void act(() =>
-                            api(`/incidents/${incident.id}/investigate`, {}),
+                            api(`/incidents/${incident.id}/investigate`, {
+                              mode,
+                              maxRepairs,
+                              allowedActions: repairChoices
+                                .map(([id]) => id)
+                                .filter((id) => allowedActions.includes(id)),
+                            }),
                           )
                         }
                       >
                         {running ? (
                           <>
-                            <span className="spinner" /> Investigating…
+                            <span className="spinner" /> Operation running…
                           </>
                         ) : run ? (
                           "Reinvestigate with Loomspan ↗"
@@ -724,6 +824,54 @@ function App() {
                       </button>
                     </div>
                   </div>
+                  {operation && (
+                    <div className="operation-summary" role="status">
+                      <strong>
+                        {operation.mode === "AUTO"
+                          ? "Auto-repair"
+                          : statusText(operation.mode)}{" "}
+                        · {statusText(operation.status)}
+                      </strong>
+                      <p>{operation.message}</p>
+                      {operation.mode === "AUTO" && (
+                        <p>
+                          {operation.repairs} / {operation.maxRepairs} repairs
+                          used. Permitted:{" "}
+                          {operation.allowedActions
+                            .map(
+                              (id) =>
+                                repairChoices.find(
+                                  ([key]) => key === id,
+                                )?.[1] || id,
+                            )
+                            .join(", ") || "none"}
+                          .
+                        </p>
+                      )}
+                      {operation.status === "ACTIVE" && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void act(() =>
+                              api(
+                                `/incidents/${incident.id}/operations/${operation.id}/stop`,
+                                {},
+                              ),
+                            )
+                          }
+                        >
+                          Stop operation
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {run?.correction && (
+                    <div className="inline-warning">
+                      Report correction: {statusText(run.correction.status)}.{" "}
+                      {run.correction.reason} One attempt maximum; original
+                      evidence is unchanged.
+                    </div>
+                  )}
                   {resolved && (
                     <div className="resolved-message">
                       <span>✓</span>
@@ -753,7 +901,11 @@ function App() {
                     <div className="running-message">
                       <span className="spinner" />
                       <div>
-                        <strong>Specialists are gathering evidence</strong>
+                        <strong>
+                          {run?.correction?.status === "STARTED"
+                            ? "Correcting the report against saved evidence"
+                            : "Specialists are gathering evidence"}
+                        </strong>
                         <p>
                           Probe receipts appear as they arrive. The observed
                           skill timeline is available after a successful
@@ -793,6 +945,8 @@ function App() {
                                   className="repair-button"
                                   disabled={
                                     busy ||
+                                    running ||
+                                    run.mode === "OBSERVE" ||
                                     stale ||
                                     incident.status !== "DIAGNOSED"
                                   }
@@ -820,7 +974,9 @@ function App() {
                       </div>
                       {run.report.recommendations.length === 0 && (
                         <p className="muted">
-                          No repair was supported by the collected evidence.
+                          {run.mode === "OBSERVE"
+                            ? "Observe mode does not authorize repairs."
+                            : "No repair was supported by the collected evidence."}
                         </p>
                       )}
                       <div className="next-step">
@@ -893,7 +1049,29 @@ function App() {
                     </p>
                   </div>
                 ))}
-              {tab === "coordination" && <Coordination run={run} />}
+              {tab === "coordination" && (
+                <>
+                  <Coordination run={run} />
+                  {run?.correction && (
+                    <div className="correction-record">
+                      <h4>
+                        Report correction · {statusText(run.correction.status)}
+                      </h4>
+                      <p>
+                        A separate skill session using saved evidence, with no
+                        repair tools.
+                      </p>
+                      <Coordination
+                        run={{
+                          ...run,
+                          sessionId: run.correction.sessionId,
+                          events: run.correction.events,
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
               {tab === "history" && (
                 <div className="activity-list">
                   {(detail?.activity || state.activity).length ? (
@@ -936,6 +1114,21 @@ function App() {
                               r.error ||
                               "No report available."}
                           </p>
+                          <p>
+                            Mode: {statusText(r.mode)}
+                            {r.correction
+                              ? ` · report correction ${statusText(r.correction.status)}`
+                              : ""}
+                          </p>
+                          {r.report?.recommendations.map((rec) => (
+                            <p key={rec.actionId}>
+                              Proposed:{" "}
+                              {repairChoices.find(
+                                ([id]) => id === rec.actionId,
+                              )?.[1] || rec.actionId}{" "}
+                              · {rec.reason}
+                            </p>
+                          ))}
                           {r.evidence.map((e) => (
                             <Evidence key={e.id} receipt={e} cited={false} />
                           ))}
