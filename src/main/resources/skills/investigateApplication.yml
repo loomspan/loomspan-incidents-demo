@@ -1,5 +1,6 @@
 name: investigateApplication
 description: Interpret checkout health, logs and deployment history. Distinguish a process outage, code regression and dependency symptom.
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills:
   - name: inspectApplication

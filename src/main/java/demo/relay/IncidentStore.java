@@ -34,7 +34,7 @@ public class IncidentStore {
     private void activity(String incident,String kind,String message,int revision) {
         String runId=incident==null?null:incident(incident).lastRunId();
         Measurement measurement=Set.of("OPENED","REPAIR","VERIFICATION").contains(kind)?Simulation.measurement(world()):null;
-        db.update("insert into activity(incident_id,created_at,kind,message,revision,run_id,measurement_json) values (?,?,?,?,?,?,?)",incident,now(),kind,message,revision,runId,measurement==null?null:encode(measurement));
+        db.update("insert into activity(incident_id,created_at,kind,message,revision,run_id,measurement_json,actor) values (?,?,?,?,?,?,?,?)",incident,now(),kind,message,revision,runId,measurement==null?null:encode(measurement),OperatorSecurity.actor());
     }
     @Transactional
     public World control(Control c) {
@@ -109,7 +109,7 @@ public class IncidentStore {
     public List<Activity> activities(String incidentId) {
         String clause=incidentId==null?"":" where incident_id=?";
         Object[] args=incidentId==null?new Object[]{}:new Object[]{incidentId};
-        return db.query("select * from activity"+clause+" order by id desc limit 100",(rs,n)->new Activity(rs.getLong("id"),rs.getString("incident_id"),rs.getString("created_at"),rs.getString("kind"),rs.getString("message"),rs.getInt("revision"),rs.getString("run_id"),decode(rs.getString("measurement_json"),Measurement.class)),args);
+        return db.query("select * from activity"+clause+" order by id desc limit 100",(rs,n)->new Activity(rs.getLong("id"),rs.getString("incident_id"),rs.getString("created_at"),rs.getString("kind"),rs.getString("message"),rs.getInt("revision"),rs.getString("run_id"),decode(rs.getString("measurement_json"),Measurement.class),rs.getString("actor")),args);
     }
     public Detail detail(String id) {
         Incident i=incident(id);
@@ -186,6 +186,7 @@ public class IncidentStore {
         return repairInternal(incidentId,request);
     }
     private World repairInternal(String incidentId, RepairRequest request) {
+        OperatorSecurity.requireRepair(request.actionId());
         Incident i=incident(incidentId); Run r=run(request.runId());
         if("OBSERVE".equals(r.mode())) throw ApiProblem.conflict("Observe mode cannot authorize repairs. Start a Recommend or Auto-repair investigation.");
         if(!r.incidentId().equals(incidentId)) throw ApiProblem.bad("The investigation belongs to another incident.");
@@ -285,6 +286,7 @@ public class IncidentStore {
         String action=null;
         for(String permitted:o.allowedActions()) if(r.report().recommendations().stream().anyMatch(rec->rec.actionId().equals(permitted))) {action=permitted;break;}
         if(action==null) {finishOperation(o,r.report().recommendations().isEmpty()?"NO_REPAIR":"POLICY_BLOCKED","No recommended repair is permitted by this operation. Operator review is required.");return null;}
+        if(!OperatorSecurity.canRepair(action)) {finishOperation(o,"ROLE_BLOCKED","The initiating operator cannot authorize this repair. An incident commander must review the evidence and apply the repair or start a new operation.");return null;}
         repairInternal(o.incidentId(),new RepairRequest(r.id(),action));
         db.update("update operation set repairs=repairs+1,expected_revision=? where id=?",world().revision(),o.id());
         if(verifyInternal(o.incidentId()).success()) {finishOperation(o,"RESOLVED","Automatic repair completed and recovery verified.");return null;}

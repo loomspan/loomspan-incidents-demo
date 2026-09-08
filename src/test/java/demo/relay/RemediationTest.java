@@ -14,6 +14,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:remediation-tests;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000","loomspan.observability.enabled=false","execution-trace.persistence=ONERROR"})
+@org.springframework.security.test.context.support.WithMockUser(username="test-commander",roles={"COMMANDER","PRESENTER"})
 class RemediationTest {
     @Autowired IncidentStore store;
     @Autowired JdbcTemplate db;
@@ -72,7 +73,7 @@ class RemediationTest {
     }
     @Test void concurrentAdvanceCannotApplyTheSameRepairTwice() throws Exception {
         Operation op=start("AUTO",List.of("START_CACHE"),2);diagnose(op.currentRunId());int revision=store.world().revision();
-        try(var executor=Executors.newFixedThreadPool(2)) {
+        try(java.util.concurrent.ExecutorService executor=new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2))) {
             var tasks=executor.invokeAll(List.<Callable<String>>of(()->store.advanceOperation(op.id()),()->store.advanceOperation(op.id())));
             for(var task:tasks) task.get();
         }

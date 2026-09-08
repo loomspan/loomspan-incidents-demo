@@ -83,6 +83,7 @@ export type Incident = {
   lastRunId: string | null;
 };
 export type Activity = {
+  actor: string | null;
   id: number;
   incidentId: string | null;
   createdAt: string;

@@ -1,5 +1,6 @@
 name: investigateIncident
 description: Coordinate selective application, capacity, network and database specialists to distinguish outages, saturation and redundancy risks and propose evidence-supported repairs.
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 planning_mode: true
 concurrency: true

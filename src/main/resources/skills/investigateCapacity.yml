@@ -1,5 +1,6 @@
 name: investigateCapacity
 description: Interpret online instances, demand and pool capacity. Distinguish lost redundancy with successful checkout from saturation or total loss of capacity. Propose only the stopped-instance starts offered by the probe. Never treat lowering simulated traffic as a repair, and never invent extra instances.
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills:
   - name: inspectCapacity

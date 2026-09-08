@@ -10,6 +10,7 @@ import type {
   Recovery,
 } from "./types";
 import "./style.css";
+import { Session, csrfHeaders, type Operator } from "./session";
 import {
   ScenarioGuide,
   RecoveryComparison,
@@ -25,10 +26,15 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
       ? {}
       : {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(await csrfHeaders()),
+          },
           body: JSON.stringify(body),
         },
   );
+  if (response.status === 401)
+    window.dispatchEvent(new Event("relay:unauthorized"));
   const value = await response.json();
   if (!response.ok)
     throw new Error(value.message || "The request could not be completed.");
@@ -75,8 +81,16 @@ const repairChoices = [
   ["RESTORE_DB_LINK", "Restore database connection"],
   ["ROLLBACK_CHECKOUT", "Roll back checkout"],
 ];
-function App() {
-  const [guide, setGuide] = useState("cache-compound");
+function App({ operator, logout }: { operator: Operator; logout: () => void }) {
+  const presenter = operator.roles.includes("PRESENTER");
+  const commander = operator.roles.includes("COMMANDER");
+  const responder = commander || operator.roles.includes("RESPONDER");
+  const canRepair = (action: string) =>
+    responder &&
+    (commander || !["RESTORE_DB_LINK", "ROLLBACK_CHECKOUT"].includes(action));
+  const [guide, setGuide] = useState(
+    sessionStorage.getItem("relay.guide") || "cache-compound",
+  );
   const [mode, setMode] = useState("RECOMMEND");
   const [allowedActions, setAllowedActions] = useState([
     "START_CACHE",
@@ -85,7 +99,9 @@ function App() {
   const [maxRepairs, setMaxRepairs] = useState(2);
   const [state, setState] = useState<State | null>(null),
     [detail, setDetail] = useState<Detail | null>(null);
-  const [selected, setSelected] = useState<string | null>(null),
+  const [selected, setSelected] = useState<string | null>(
+      sessionStorage.getItem("relay.incident"),
+    ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -93,7 +109,14 @@ function App() {
     [tab, setTab] = useState<
       "timeline" | "evidence" | "coordination" | "history"
     >("timeline");
-  const selectedRef = useRef<string | null>(null);
+  const selectedRef = useRef<string | null>(selected);
+  useEffect(() => {
+    if (selected) sessionStorage.setItem("relay.incident", selected);
+    else sessionStorage.removeItem("relay.incident");
+  }, [selected]);
+  useEffect(() => {
+    sessionStorage.setItem("relay.guide", guide);
+  }, [guide]);
   async function refresh() {
     const next = await api<State>("/state");
     setState(next);
@@ -208,7 +231,7 @@ function App() {
       select(i.id);
       setTitle("");
       setNotice(
-        `${scenario.title} is ready. Review the operating mode, then start the investigation.`,
+        `${scenario.title} is ready. Switch to Responder to review the mode and start the investigation.`,
       );
       document
         .getElementById("incident-workspace")
@@ -229,7 +252,7 @@ function App() {
       role="switch"
       aria-checked={on}
       aria-label={label}
-      disabled={busy}
+      disabled={busy || !presenter}
       onClick={() => void control(name, !on)}
     >
       <span />
@@ -244,6 +267,11 @@ function App() {
             relay<span className="brand-dot">.</span>
           </span>
         </a>
+        <div className="operator-card">
+          <strong>{operator.username}</strong>
+          <small>{operator.roles.join(", ").toLowerCase()}</small>
+          <button onClick={logout}>Switch operator / Sign out</button>
+        </div>
         <div className="workspace-label">OPERATIONS WORKSPACE</div>
         <div className="nav-active">
           <span>◈</span> Incident desk <b>{activeCount}</b>
@@ -340,11 +368,21 @@ function App() {
               </button>
             </div>
           )}
+          <p className="role-note">
+            {presenter
+              ? "Presenter: prepare the environment, then switch to Responder to investigate."
+              : commander
+                ? "Incident commander: review evidence and authorize any supported repair."
+                : responder
+                  ? "Responder: investigate and apply routine repairs. Network changes and rollbacks require an incident commander."
+                  : "Viewer: browse incidents, evidence, and recovery history. Sign in as Responder to investigate."}
+          </p>
           <ScenarioGuide
             selected={guide}
             onSelect={setGuide}
             onPrepare={() => void prepareWalkthrough()}
             disabled={busy || running}
+            canPrepare={presenter}
           />
           <section className="system-panel">
             <div className="section-head">
@@ -510,7 +548,7 @@ function App() {
                 <select
                   id="traffic-level"
                   value={w.demandRps}
-                  disabled={busy}
+                  disabled={busy || !presenter}
                   onChange={(e) =>
                     void act(() =>
                       api("/environment/traffic", {
@@ -583,7 +621,7 @@ function App() {
                 <label htmlFor="cache-hit-rate">Cache hit rate</label>
                 <select
                   id="cache-hit-rate"
-                  disabled={busy}
+                  disabled={busy || !presenter}
                   value={w.cacheHitPercent ?? 90}
                   onChange={(e) =>
                     void cache(!!w.cacheRunning, Number(e.target.value))
@@ -603,7 +641,7 @@ function App() {
                   role="switch"
                   aria-checked={!!w.cacheRunning}
                   aria-label="Cache service running"
-                  disabled={busy}
+                  disabled={busy || !presenter}
                   onClick={() =>
                     void cache(!w.cacheRunning, w.cacheHitPercent ?? 90)
                   }
@@ -656,7 +694,7 @@ function App() {
                 ["cache-compound", "Two-stage cache recovery"],
               ].map(([name, label]) => (
                 <button
-                  disabled={busy}
+                  disabled={busy || !presenter}
                   key={name}
                   onClick={() => void preset(name)}
                 >
@@ -666,7 +704,7 @@ function App() {
               ))}
               <button
                 className="restore"
-                disabled={busy}
+                disabled={busy || !presenter}
                 onClick={() => void preset("healthy")}
               >
                 Restore healthy
@@ -722,7 +760,8 @@ function App() {
                   <h3>Let the evidence lead.</h3>
                   <p>
                     Change a component above, open an incident, and let the
-                    commander choose the specialists needed to investigate.
+                    investigation coordinator choose the specialists needed to
+                    investigate.
                   </p>
                   <label htmlFor="incident-title">
                     Incident description <span>(optional)</span>
@@ -736,7 +775,7 @@ function App() {
                   />
                   <button
                     className="primary"
-                    disabled={busy}
+                    disabled={busy || (!responder && !presenter)}
                     onClick={() => void openIncident()}
                   >
                     Open incident <span>→</span>
@@ -755,7 +794,7 @@ function App() {
                       <select
                         id="remediation-mode"
                         value={policyMode}
-                        disabled={busy || running || resolved}
+                        disabled={busy || running || resolved || !responder}
                         onChange={(e) => setMode(e.target.value)}
                       >
                         <option value="OBSERVE">Observe · diagnose only</option>
@@ -775,7 +814,9 @@ function App() {
                       </p>
                       {policyMode === "AUTO" && (
                         <>
-                          <fieldset disabled={busy || running || resolved}>
+                          <fieldset
+                            disabled={busy || running || resolved || !responder}
+                          >
                             <legend>Permitted automatic repairs</legend>
                             {repairChoices.map(([id, label]) => (
                               <label key={id}>
@@ -799,7 +840,7 @@ function App() {
                           <label htmlFor="repair-limit">Maximum repairs</label>
                           <select
                             id="repair-limit"
-                            disabled={busy || running || resolved}
+                            disabled={busy || running || resolved || !responder}
                             value={policyLimit}
                             onChange={(e) =>
                               setMaxRepairs(Number(e.target.value))
@@ -821,7 +862,7 @@ function App() {
                     <div className="workflow-actions">
                       <button
                         className="primary"
-                        disabled={busy || running || resolved}
+                        disabled={busy || running || resolved || !responder}
                         onClick={() =>
                           void act(() =>
                             api(`/incidents/${incident.id}/investigate`, {
@@ -845,7 +886,7 @@ function App() {
                         )}
                       </button>
                       <button
-                        disabled={busy || running || resolved}
+                        disabled={busy || running || resolved || !responder}
                         onClick={() =>
                           void act(async () => {
                             const r = await api<Recovery>(
@@ -869,7 +910,9 @@ function App() {
                         · {statusText(operation.status)}
                       </strong>
                       <p>{operation.message}</p>
-                      <OperationExplanation operation={operation} />
+                      {!resolved && (
+                        <OperationExplanation operation={operation} />
+                      )}
                       {operation.mode === "AUTO" && (
                         <p>
                           {operation.repairs} / {operation.maxRepairs} repairs
@@ -887,7 +930,7 @@ function App() {
                       )}
                       {operation.status === "ACTIVE" && (
                         <button
-                          disabled={busy}
+                          disabled={busy || !responder}
                           onClick={() =>
                             void act(() =>
                               api(
@@ -957,7 +1000,7 @@ function App() {
                         <span>
                           {stale || resolved
                             ? `HISTORICAL ASSESSMENT · REV ${run.snapshot.revision}`
-                            : "COMMANDER’S ASSESSMENT"}
+                            : "INVESTIGATION ASSESSMENT"}
                         </span>
                         <Pill>{run.report.confidence} confidence</Pill>
                       </div>
@@ -978,10 +1021,18 @@ function App() {
                                 <h4>{action?.label || rec.actionId}</h4>
                                 <p>{rec.reason}</p>
                                 <small>{action?.effect}</small>
+                                {!canRepair(rec.actionId) && (
+                                  <p className="role-note">
+                                    {responder
+                                      ? "Incident commander authorization required."
+                                      : "Sign in as an authorized operator to apply this repair."}
+                                  </p>
+                                )}
                                 <button
                                   className="repair-button"
                                   disabled={
                                     busy ||
+                                    !canRepair(rec.actionId) ||
                                     running ||
                                     run.mode === "OBSERVE" ||
                                     stale ||
@@ -1028,7 +1079,7 @@ function App() {
                       <div className="waiting">
                         <span>◌</span>
                         <p>
-                          Ready to investigate. The commander receives the
+                          Ready to investigate. The coordinator receives the
                           customer symptom and can ask specialists for evidence.
                         </p>
                       </div>
@@ -1184,7 +1235,7 @@ function App() {
             <div className="new-incident">
               <p>A new failure deserves its own record.</p>
               <button
-                disabled={busy}
+                disabled={busy || (!responder && !presenter)}
                 onClick={() => {
                   selectedRef.current = null;
                   setSelected(null);
@@ -1296,4 +1347,10 @@ function Coordination({ run }: { run?: Run }) {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <Session>
+    {(operator, logout) => (
+      <App key={operator.username} operator={operator} logout={logout} />
+    )}
+  </Session>,
+);

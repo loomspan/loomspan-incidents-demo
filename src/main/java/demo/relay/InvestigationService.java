@@ -26,7 +26,9 @@ public class InvestigationService {
     public Run start(String incidentId) { return start(incidentId,null); }
     public Run start(String incidentId,InvestigationOptions options) {
         Operation op=store.startOperation(incidentId,options);
-        try { executor.execute(()->executeOperation(op.id())); }
+        var caller=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        caller.setAuthentication(org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication());
+        try { executor.execute(new org.springframework.security.concurrent.DelegatingSecurityContextRunnable(()->executeOperation(op.id()),caller)); }
         catch(RejectedExecutionException e) { store.stopOperation(op.id(),"FAILED","Investigation queue is full. Retry shortly."); }
         return store.run(op.currentRunId());
     }

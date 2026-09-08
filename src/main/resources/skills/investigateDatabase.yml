@@ -1,5 +1,6 @@
 name: investigateDatabase
 description: Interpret local database health, cache state, hit rate and offered database operations against capacity. Distinguish a stopped database from a live but saturated database caused by cache misses. A healthy local check does not prove application reachability. Recommend only exact repairs from the receipt; a cache start preserves the configured hit rate.
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills:
   - name: inspectDatabase

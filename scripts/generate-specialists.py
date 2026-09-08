@@ -10,6 +10,7 @@ for domain, probe, mission in [
 ]:
     (root / f'investigate{domain}.yml').write_text(f'''name: investigate{domain}
 description: {mission}
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills:
   - name: {probe}

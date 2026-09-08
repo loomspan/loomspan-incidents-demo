@@ -5,11 +5,13 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
-**Current slice:** guided scenarios, a recovery timeline with linked evidence,
-saved before-and-after measurements, and clear explanations when automatic work stops.
-Start with **Prepare walkthrough** for two-stage cache recovery, then review the mode
-and start the investigation. See the [presentation guide](docs/presentation-slice.md).
-Observe, Recommend and Auto-repair modes and existing incident history remain available.
+**Current slice:** authenticated operator roles, framework skill permissions, and
+an audit trail identifying who investigated and repaired each incident.
+Sign in as `presenter` to prepare a walkthrough, then switch to `responder` to
+investigate. `commander` authorizes network repairs and rollbacks; `viewer` reads
+saved evidence. All four local demo accounts use password `relay-demo`.
+See the [operator handoff guide](docs/operator-roles.md) and
+[presentation guide](docs/presentation-slice.md).
 
 ## Run
 
@@ -39,17 +41,18 @@ Provider calls contain incident descriptions and simulated probe evidence.
 
 For development, run `./mvnw spring-boot:run -DskipFrontend=true` and `npm run dev`
 in `frontend/` after `npm ci`. Vite proxies `/api` to the default backend port 8083.
-The app binds to loopback and has no production authentication or real infrastructure access.
+The app binds to loopback and uses seeded demo accounts with session authentication.
+It has no production identity-provider integration or real infrastructure access.
 
 ## First walkthrough
 
-1. Choose **Blocked connection**. Both processes remain running, but customer
+1. Sign in as `presenter` and choose **Blocked connection**. Both processes remain running, but customer
    checkout fails with a database connection timeout.
 2. Choose **Open incident**, leaving the description empty to use the actual symptom.
-3. Choose **Investigate with Loomspan**. The commander selects application,
+3. Switch to `responder`, select the incident, and choose **Investigate with Loomspan**. The coordinator selects application,
    network and database specialists. Their probes read the same saved environment
    snapshot. Evidence receipts appear as probes run.
-4. Review the diagnosis and cited evidence, then **Apply simulated repair** for
+4. Switch to `commander`, review the diagnosis and cited evidence, then **Apply simulated repair** for
    **Restore database connection**. Repairing does not resolve the incident.
 5. Choose **Verify recovery**. A fresh synthetic checkout succeeds, resolving
    the incident and recording the verification revision.
@@ -58,6 +61,9 @@ The app binds to loopback and has no production authentication or real infrastru
    its history remains.
 
 ## Signature walkthrough: two faults
+
+Prepare faults as `presenter`, then sign in as `commander` for the following
+investigation and repair steps. Cache-only repairs can also run as `responder`.
 
 1. Choose **Two faults**, then open a new incident.
 2. Investigate the checkout validation exception. The application specialist
@@ -170,7 +176,7 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 .\mvnw.cmd package
 ```
 
-The suite includes 36 deterministic tests and six opt-in live model tests.
+The suite includes 43 deterministic tests and six opt-in live model tests.
 Remediation tests cover permissions, limits, stale state, cancellation, restart,
 concurrent advancement and one bounded correction attempt.
 Tests also cover all 16 original fault combinations plus 128 two-instance/load cases,

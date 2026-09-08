@@ -74,6 +74,7 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
 ## Candidate follow-on slices
 
 1. Additional path-specific failures such as DNS and region-specific connectivity.
-2. Authenticated operator roles building on the existing application repair policy.
-3. Controlled snapshot refresh during investigation, if the framework's supported
+2. Controlled snapshot refresh during investigation, if the framework's supported
    mission semantics make that useful without hidden state propagation.
+
+Authenticated roles and repair handoff are implemented; see [operator roles](operator-roles.md).

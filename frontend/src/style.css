@@ -1938,3 +1938,58 @@ footer {
     gap: 12px;
   }
 }
+
+.sign-in {
+  margin-left: 0;
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #edf3ef;
+}
+.sign-in form {
+  width: min(540px, 100%);
+  background: white;
+  padding: 40px;
+  border: 1px solid #d8e3dd;
+  border-radius: 20px;
+  display: grid;
+  gap: 18px;
+}
+.sign-in h1 {
+  font-size: 36px;
+  line-height: 1.15;
+  margin: 0;
+}
+.sign-in p,
+.sign-in small {
+  line-height: 1.6;
+}
+.sign-in input,
+.sign-in select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #bbcfc3;
+  border-radius: 8px;
+}
+.operator-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  color: #e2eee7;
+}
+.operator-card small {
+  text-transform: capitalize;
+}
+.operator-card button {
+  background: #304c43;
+  color: white;
+  border: 1px solid #587267;
+  border-radius: 6px;
+  padding: 8px;
+}
+.role-note {
+  color: #815722;
+  font-size: 12px;
+}

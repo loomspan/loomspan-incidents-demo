@@ -79,11 +79,13 @@ export function ScenarioGuide({
   onSelect,
   onPrepare,
   disabled,
+  canPrepare,
 }: {
   selected: string;
   onSelect: (id: string) => void;
   onPrepare: () => void;
   disabled: boolean;
+  canPrepare: boolean;
 }) {
   const scenario = scenarios.find((s) => s.id === selected) ?? scenarios[0];
   return (
@@ -133,12 +135,16 @@ export function ScenarioGuide({
         </div>
       </div>
       <div className="guide-footer">
-        <button className="primary" disabled={disabled} onClick={onPrepare}>
+        <button
+          className="primary"
+          disabled={disabled || !canPrepare}
+          onClick={onPrepare}
+        >
           Prepare walkthrough →
         </button>
         <span>
-          Sets the shared environment and opens a new incident. Start the
-          investigation when ready.
+          Presenter sets the shared environment and opens an incident. Responder
+          starts the investigation.
         </span>
       </div>
     </section>
@@ -265,6 +271,10 @@ export function RecoveryComparison({
   );
 }
 const stopCopy: Record<string, [string, string]> = {
+  ROLE_BLOCKED: [
+    "Incident commander authorization required",
+    "The initiating operator cannot execute this repair. Sign in as Incident commander, review the evidence, then apply the proposed repair or start a fresh operation.",
+  ],
   POLICY_BLOCKED: [
     "Repair permission needed",
     "Review the supported proposal. Apply it manually, or start a new operation with the permission you intend to grant.",
@@ -357,7 +367,8 @@ export function RecoveryTimeline({ detail }: { detail: Detail | null }) {
               <span className="story-dot" />
               <article>
                 <small>
-                  {at(a.createdAt)} · REV {a.revision}
+                  {at(a.createdAt)} · REV {a.revision} ·{" "}
+                  {a.actor ?? "Operator not recorded"}
                 </small>
                 <h3>
                   {passed === true

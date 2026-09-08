@@ -1,5 +1,24 @@
 # Verification record
 
+## Authenticated operator roles — 2026-09-07
+
+- **43 deterministic tests passed**, including seven new security tests covering
+  cookie login/logout, CSRF, route permissions, Java/YAML facade denial, repair
+  handoff, automatic privilege boundaries and captured background identity.
+- A live Responder two-stage cache test passed with both routine repairs and fresh
+  evidence (`target/roles-live-cache.log`). The other five opt-in live tests were
+  not rerun for this slice.
+- Browser verification prepared a blocked-path incident as Presenter, investigated
+  it as Responder with the network repair allowlisted, and observed `ROLE_BLOCKED`
+  with zero repairs. The real run also successfully used the bounded correction
+  skill. Commander then applied the repair and verified recovery at revision 27.
+  Timeline entries identify all three operators.
+- V6 preserved the world and all six previous incident histories. Comparison
+  normalized timestamp formatting introduced by PowerShell JSON serialization;
+  prior actors remain null. Backup: `data/relay-before-roles.mv.db`.
+- Frontend type checking and runnable packaging passed. Desktop sign-in and
+  operator-history layouts were inspected; mobile was not device-tested.
+
 ## Guided presentation — 2026-09-07
 
 - **36 deterministic tests passed**; six opt-in live tests were skipped in this

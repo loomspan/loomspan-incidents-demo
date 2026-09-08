@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
     "spring.datasource.url=jdbc:h2:mem:relay-tests;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
     "loomspan.observability.enabled=false","execution-trace.persistence=ONERROR"})
+@org.springframework.security.test.context.support.WithMockUser(username="test-commander",roles={"COMMANDER","PRESENTER"})
 class IncidentApplicationTest {
     @Autowired IncidentStore store;
     @Autowired JdbcTemplate db;
@@ -86,7 +87,7 @@ class IncidentApplicationTest {
     }
     @Test void repairIsIdempotentAndConcurrentCopiesMutateOnce() throws Exception {
         Run r=prepare("connection");finish(r,store.probe(r.id(),"inspectNetwork"));int before=store.world().revision();
-        try(var executor=Executors.newFixedThreadPool(2)) {
+        try(java.util.concurrent.ExecutorService executor=new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2))) {
             Callable<World> task=()->store.repair(r.incidentId(),new RepairRequest(r.id(),"RESTORE_DB_LINK"));
             var futures=executor.invokeAll(List.of(task,task));for(var f:futures) assertThat(f.get().linkAllowed()).isTrue();
         }
@@ -132,12 +133,12 @@ class IncidentApplicationTest {
         assertThat(views.getFirst().events()).extracting(ai.loomspan.api.SkillExecutionEvent::type).contains("SKILL_STARTED","SKILL_FINISHED");
     }
     @Test void httpFlowReturnsStructuredErrorsAndDurableIncidentDetail() throws Exception {
-        HttpClient client=HttpClient.newHttpClient();String base="http://127.0.0.1:"+port+"/api";
-        var create=client.send(HttpRequest.newBuilder(URI.create(base+"/incidents")).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"Checkout unavailable\"}")).build(),HttpResponse.BodyHandlers.ofString());
+        var client=new SessionClient(port);client.login("presenter");
+        var create=client.post("/incidents","{\"title\":\"Checkout unavailable\"}");
         assertThat(create.statusCode()).isEqualTo(200);Incident i=json.readValue(create.body(),Incident.class);
-        var get=client.send(HttpRequest.newBuilder(URI.create(base+"/incidents/"+i.id())).GET().build(),HttpResponse.BodyHandlers.ofString());
+        var get=client.get("/incidents/"+i.id());
         assertThat(json.readValue(get.body(),Detail.class).incident().title()).isEqualTo("Checkout unavailable");
-        var stale=client.send(HttpRequest.newBuilder(URI.create(base+"/environment/preset")).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"connection\",\"expectedRevision\":99}")).build(),HttpResponse.BodyHandlers.ofString());
+        var stale=client.post("/environment/preset","{\"name\":\"connection\",\"expectedRevision\":99}");
         assertThat(stale.statusCode()).isEqualTo(409);assertThat(stale.body()).contains("environment changed");
     }
     @Test void productionCodeUsesOnlySupportedLoomspanApi() throws Exception {

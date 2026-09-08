@@ -5,6 +5,7 @@ import ai.loomspan.api.SkillParam;
 import org.springframework.stereotype.Component;
 import static demo.relay.Contracts.*;
 
+@jakarta.annotation.security.RolesAllowed({"RESPONDER","COMMANDER"})
 @Component
 public class ProbeSkills {
     private final IncidentStore store;

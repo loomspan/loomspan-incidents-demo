@@ -46,7 +46,7 @@ public final class Contracts {
                       List<Receipt> evidence, String mode, Correction correction, Measurement measurement) {}
     public record Incident(String id, String title, String status, String createdAt, String lastRunId) {}
     public record Activity(long id, String incidentId, String createdAt, String kind, String message, int revision,
-                           String runId, Measurement measurement) {}
+                           String runId, Measurement measurement, String actor) {}
     public record Detail(Incident incident, List<Run> runs, List<Activity> activity, List<Operation> operations) {}
     public record State(World environment, TransactionResult checkout, Capacity capacity, DataLoad dataLoad, List<Incident> incidents, List<Activity> activity) {}
 }

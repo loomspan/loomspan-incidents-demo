@@ -16,6 +16,8 @@ public class ApiProblem extends RuntimeException {
 
 @RestControllerAdvice
 class ProblemAdvice {
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<?> denied(Exception e) { return ResponseEntity.status(403).body(Map.of("message",e.getMessage())); }
     @ExceptionHandler(ApiProblem.class)
     ResponseEntity<?> problem(ApiProblem e) { return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage())); }
     @ExceptionHandler(HttpMessageNotReadableException.class)

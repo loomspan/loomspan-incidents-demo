@@ -1,5 +1,6 @@
 name: investigateNetwork
 description: Interpret DNS, firewall and connectivity evidence. Distinguish blocked traffic from an allowed path to an unavailable dependency.
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills:
   - name: inspectNetwork

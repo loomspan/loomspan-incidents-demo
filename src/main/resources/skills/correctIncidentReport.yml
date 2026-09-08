@@ -1,5 +1,6 @@
 name: correctIncidentReport
 description: Correct one invalid incident report against authoritative saved receipts without collecting new evidence or performing repairs.
+rbac_roles: [RESPONDER, COMMANDER]
 model: investigator
 allowed_skills: []
 prompt: |

@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:relay-live;DB_CLOSE_DELAY=-1",
     "loomspan.observability.enabled=false"})
 @EnabledIfSystemProperty(named="relay.live",matches="true")
+@org.springframework.security.test.context.support.WithMockUser(username="test-commander",roles={"COMMANDER","PRESENTER"})
 class LiveInvestigationTest {
     @Autowired IncidentStore store;
     @Autowired InvestigationService investigations;
@@ -77,6 +78,7 @@ class LiveInvestigationTest {
             assertThat(store.verify(i.id()).success()).isTrue();
         }
     }
+    @org.springframework.security.test.context.support.WithMockUser(username="responder",roles="RESPONDER")
     @Test void automaticTwoStageCacheRecoveryUsesSavedPolicyAndFreshEvidence() {
         store.preset(new Preset("cache-compound",store.world().revision()));
         Incident i=store.create(new NewIncident(null));
