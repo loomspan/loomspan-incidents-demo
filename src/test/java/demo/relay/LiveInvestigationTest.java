@@ -32,6 +32,7 @@ class LiveInvestigationTest {
         store.preset(new Preset("compound",store.world().revision()));
         Incident i=store.create(new NewIncident(null));Run first=investigate(i.id());
         assertThat(first.report().recommendations()).extracting(Recommendation::actionId).contains("ROLLBACK_CHECKOUT");
+        assertThat(first.evidence()).extracting(Receipt::probe).contains("inspectApplication").doesNotContain("inspectNetwork");
         store.repair(i.id(),new RepairRequest(first.id(),"ROLLBACK_CHECKOUT"));
         assertThat(store.verify(i.id()).success()).isFalse();
         Run second=investigate(i.id());
@@ -101,6 +102,27 @@ class LiveInvestigationTest {
         assertThat(runs.get(0).report().recommendations()).extracting(Recommendation::actionId).containsExactly("RESTORE_DB_LINK");
         assertThat(runs.get(1).snapshot().dnsHealthy()).isFalse();assertThat(runs.get(0).snapshot().dnsHealthy()).isTrue();
         assertThat(store.operation(op.id()).repairs()).isEqualTo(2);
+    }
+    @org.springframework.security.test.context.support.WithMockUser(username="responder",roles="RESPONDER")
+    @Test void frameworkTourResponderHandoffRetainsValidatedEvidence() {
+        store.preset(new Preset("connection",store.world().revision()));
+        Incident i=store.create(new NewIncident(null));
+        Operation op=store.startOperation(i.id(),new InvestigationOptions("AUTO",List.of("RESTORE_DB_LINK"),1));
+        investigations.executeOperation(op.id());
+        assertThat(store.operation(op.id()).status()).withFailMessage("%s",store.detail(i.id())).isEqualTo("ROLE_BLOCKED");
+        Run run=store.run(op.currentRunId());assertThat(run.sessionId()).isNotBlank();
+        assertThat(run.report().recommendations()).extracting(Recommendation::actionId).contains("RESTORE_DB_LINK");
+        assertThat(store.world().linkAllowed()).isFalse();
+        var previous=org.springframework.security.core.context.SecurityContextHolder.getContext();
+        var commander=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        commander.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("commander","unused",List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_COMMANDER"))));
+        try {
+            org.springframework.security.core.context.SecurityContextHolder.setContext(commander);
+            store.repair(i.id(),new RepairRequest(run.id(),"RESTORE_DB_LINK"));
+            assertThat(store.verify(i.id()).success()).isTrue();
+            assertThat(store.activities(i.id())).anyMatch(a->a.kind().equals("DIAGNOSIS")&&"responder".equals(a.actor()))
+                .anyMatch(a->a.kind().equals("REPAIR")&&"commander".equals(a.actor()));
+        } finally { org.springframework.security.core.context.SecurityContextHolder.setContext(previous); }
     }
     @Test void correctionSkillRepairsInventedReferencesWithActualReceipts() {
         store.preset(new Preset("cache",store.world().revision()));

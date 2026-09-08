@@ -5,14 +5,13 @@ with coordinated Loomspan skills, apply a supported repair, and verify recovery.
 The environment, incidents, immutable evidence, reports, and action history persist
 in a real H2 database. Infrastructure is simulated; model investigation is real.
 
-**Current slice:** DNS failures and layered network recovery. A missing database
-hostname record can hide a firewall fault: repair DNS, verify, then investigate
-fresh evidence before the second repair. See the [DNS walkthrough](docs/dns-slice.md).
+Start with the **three-walkthrough framework tour**: selective investigation,
+coordinated specialists, and authenticated skill execution. Each walkthrough
+explains what Loomspan provides, what Relay implements, and which recorded
+facts to inspect. See the [presenter guide](docs/framework-tour.md).
 
-Sign in as `presenter` to prepare scenarios, `responder` to investigate, and
-`commander` to authorize DNS, firewall and rollback repairs. All demo accounts
-(including read-only `viewer`) use password `relay-demo`.
-See [operator roles](docs/operator-roles.md) and [presentation](docs/presentation-slice.md).
+Demo accounts `presenter`, `responder`, `commander`, and `viewer` use password
+`relay-demo`. See [operator roles](docs/operator-roles.md).
 
 ## Run
 
@@ -45,62 +44,22 @@ in `frontend/` after `npm ci`. Vite proxies `/api` to the default backend port 8
 The app binds to loopback and uses seeded demo accounts with session authentication.
 It has no production identity-provider integration or real infrastructure access.
 
-## First walkthrough
+## Framework tour
 
-1. Sign in as `presenter` and choose **Blocked connection**. Both processes remain running, but customer
-   checkout fails with a database connection timeout.
-2. Choose **Open incident**, leaving the description empty to use the actual symptom.
-3. Switch to `responder`, select the incident, and choose **Investigate with Loomspan**. The coordinator selects application,
-   network and database specialists. Their probes read the same saved environment
-   snapshot. Evidence receipts appear as probes run.
-4. Switch to `commander`, review the diagnosis and cited evidence, then **Apply simulated repair** for
-   **Restore database connection**. Repairing does not resolve the incident.
-5. Choose **Verify recovery**. A fresh synthetic checkout succeeds, resolving
-   the incident and recording the verification revision.
-6. Explore **Coordination** for the observed skill timeline and **History** for
-   the incident record. Restart the app and select the incident from the sidebar;
-   its history remains.
+1. **One fault hides another:** compare the selected specialists before and after a rollback.
+2. **Two-stage cache recovery:** inspect required specialists, actual timing and dependent evidence collection.
+3. **Healthy services, broken path:** diagnose as Responder, then review and repair as Commander.
 
-## Signature walkthrough: two faults
+Prepare as Presenter and switch operators as the guide describes. **Coordination**
+shows recorded execution and Console inspection instructions. **History** includes
+previous investigations with their own sessions and timing records.
 
-Prepare faults as `presenter`, then sign in as `commander` for the following
-investigation and repair steps. Cache-only repairs can also run as `responder`.
-
-1. Choose **Two faults**, then open a new incident.
-2. Investigate the checkout validation exception. The application specialist
-   should identify the bad deployment and propose a rollback.
-3. Apply the rollback, then verify. Checkout still fails: the blocked database
-   path remains. The incident returns to **open**.
-4. Reinvestigate the new symptom. Application, network and database findings
-   distinguish blocked traffic from a stopped database.
-5. Restore the database connection and verify again. This time checkout succeeds.
-
-The presenter controls are separate from the investigator's view. Presets change
-component state, never return canned diagnoses. An investigation receives its
-opaque run ID, ticket and customer symptom, not the preset name or fault switches.
-Model wording and chosen plans may vary; receipts, action validation and checkout
-outcomes are deterministic.
-
-## Capacity walkthrough: risk becomes impact
-
-1. Choose **Lost redundancy**, then open an incident. Checkout A handles all
-   60 requests/s; B is stopped. Customer checkout passes but **Redundancy lost**
-   is shown separately. This is an availability risk, not a customer outage.
-2. Investigate. The commander coordinates application and capacity specialists
-   and can recommend **Start checkout B**. Try **Verify recovery** before repairing:
-   the successful customer check alone cannot resolve an unmet availability target.
-3. Change **Incoming traffic** to **Peak · 150 req/s**. One instance can handle
-   only 100 requests/s, so 50 requests/s now fail. Any earlier proposal is stale.
-4. Reinvestigate the current symptom, apply **Start checkout B**, then verify.
-   Traffic stays at 150 requests/s, both instances are online, and all requests succeed.
-5. For an infeasible case, use **Restore healthy**, choose **Beyond pool capacity ·
-   240 req/s**, and open another incident. The pool admits 200 requests/s,
-   but database load also saturates: 59 requests/s fail. There is no supported scale-out or traffic
-   reduction repair; the investigation should explain the shortfall and escalate.
-
-**Overloaded instance** presets step 3 directly. A broken deployment and the
-database connection are shared by both instances; adding a healthy process cannot
-repair broken code or a blocked dependency. See [capacity rules](docs/capacity-slice.md).
+Follow the [tour script and acceptance criteria](docs/framework-tour.md), including
+the distinction between framework authorization and Relay's repair policy.
+Concurrency and correction use are shown only when supported by the actual run.
+Additional [capacity](docs/capacity-slice.md), [cache](docs/cache-slice.md),
+[DNS](docs/dns-slice.md), and [presentation](docs/presentation-slice.md) scenarios
+remain available for exploration.
 
 ## Simulation and skill boundaries
 
@@ -177,7 +136,7 @@ are retained by default with `RELAY_TRACE_PERSISTENCE=ALWAYS`.
 .\mvnw.cmd package
 ```
 
-The suite includes 48 deterministic tests and seven opt-in live model tests.
+The suite includes 48 deterministic tests and eight opt-in live model tests.
 Remediation tests cover permissions, limits, stale state, cancellation, restart,
 concurrent advancement and one bounded correction attempt.
 Tests also cover all 16 original fault combinations plus 128 two-instance/load cases,

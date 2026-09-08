@@ -51,7 +51,7 @@ export const scenarios = [
       "Watch a repair reveal the work still needed. The first verification fails; fresh evidence leads to a second repair.",
     mode: "AUTO",
     steps: [
-      "Prepare the incident, then start the investigation with the two cache permissions and a two-repair limit.",
+      "Prepare as Presenter. Switch to Responder, choose Auto-repair, select both cache repairs, and set a two-repair limit.",
       "Watch the cache start. Its low hit rate still overloads the database, so verification should fail.",
       "Follow the fresh investigation and hit-rate repair. Recovery should pass with traffic unchanged.",
     ],
@@ -67,12 +67,12 @@ export const scenarios = [
       "A correct first diagnosis can be incomplete. Removing one fault exposes a different customer symptom.",
     mode: "RECOMMEND",
     steps: [
-      "Investigate and review the rollback proposal.",
+      "Prepare as Presenter. Switch to Commander, investigate and review the rollback proposal.",
       "Apply the rollback and verify. A database connection timeout should remain.",
       "Reinvestigate, restore the database connection, and verify again.",
     ],
     watch:
-      "The commander should change which specialists it uses when the symptom changes.",
+      "The investigation coordinator should change which specialists it uses when the symptom changes.",
   },
   {
     id: "redundancy",
@@ -99,14 +99,44 @@ export const scenarios = [
     lesson: "Local health checks cannot establish end-to-end connectivity.",
     mode: "RECOMMEND",
     steps: [
-      "Compare the application, network and database findings.",
-      "Apply the supported database-connection repair.",
+      "Prepare as Presenter. Switch to Responder and compare application, network and database findings.",
+      "The repair is unavailable to Responder. Switch to Commander, review the saved evidence, and apply it.",
       "Verify checkout and instance availability before resolving.",
     ],
     watch:
       "The network evidence explains why two healthy services cannot communicate.",
   },
 ];
+export const featuredIds = ["compound", "cache-compound", "connection"];
+const frameworkLessons: Record<
+  string,
+  { loomspan: string; relay: string; proof: string }
+> = {
+  compound: {
+    loomspan:
+      "The planner selects skills for the current symptom. Each investigation produces a structured, evidence-backed assessment.",
+    relay:
+      "Validates receipt references, applies a reviewed repair, verifies checkout, and starts a separate investigation against a fresh snapshot.",
+    proof:
+      "Compare the two Coordination records: deployment evidence first, then network and database evidence. Each reassessment has its own session.",
+  },
+  "cache-compound": {
+    loomspan:
+      "Required application, capacity and database specialists can execute concurrently; the final evidence reader depends on their completion.",
+    relay:
+      "Enforces the repair allowlist and limit, applies repairs, and verifies recovery between investigations.",
+    proof:
+      "Check sibling specialist timing bars for overlap, then inspect the plan in Console. Concurrency is supported, but grouping and overlap must be observed for this run.",
+  },
+  connection: {
+    loomspan:
+      "Carries the authenticated caller through nested skills and enforces YAML and Java skill role policies.",
+    relay:
+      "Allows Responder diagnosis but requires Commander authorization for network repair, recording both operators.",
+    proof:
+      "Investigate as Responder, then apply the proposal as Commander. Repair denial demonstrates Relay policy; Viewer skill denial is covered by the framework-facade integration test.",
+  },
+};
 export function ScenarioGuide({
   selected,
   onSelect,
@@ -125,11 +155,11 @@ export function ScenarioGuide({
     <section className="scenario-guide" aria-labelledby="scenario-heading">
       <div className="guide-heading">
         <div>
-          <span className="eyebrow">GUIDED DEMOS</span>
-          <h2 id="scenario-heading">See the system adapt.</h2>
+          <span className="eyebrow">LOOMSPAN FRAMEWORK TOUR</span>
+          <h2 id="scenario-heading">Three ways to see Loomspan at work.</h2>
           <p>
-            Choose a story, introduce its faults, and follow the recorded
-            evidence.
+            Start with the three featured walkthroughs. Other scenarios remain
+            available for exploration.
           </p>
         </div>
         <label>
@@ -139,11 +169,25 @@ export function ScenarioGuide({
             onChange={(e) => onSelect(e.target.value)}
             disabled={disabled}
           >
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title}
-              </option>
-            ))}
+            <optgroup label="Framework tour">
+              {featuredIds.map((id, index) => {
+                const s = scenarios.find((s) => s.id === id)!;
+                return (
+                  <option key={id} value={id}>
+                    {index + 1}. {s.title}
+                  </option>
+                );
+              })}
+            </optgroup>
+            <optgroup label="More scenarios">
+              {scenarios
+                .filter((s) => !featuredIds.includes(s.id))
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+            </optgroup>
           </select>
         </label>
       </div>
@@ -167,6 +211,22 @@ export function ScenarioGuide({
           </details>
         </div>
       </div>
+      {frameworkLessons[scenario.id] && (
+        <div className="framework-lessons">
+          <div>
+            <strong>Loomspan provides</strong>
+            <p>{frameworkLessons[scenario.id].loomspan}</p>
+          </div>
+          <div>
+            <strong>Relay provides</strong>
+            <p>{frameworkLessons[scenario.id].relay}</p>
+          </div>
+          <div>
+            <strong>Verify it in this run</strong>
+            <p>{frameworkLessons[scenario.id].proof}</p>
+          </div>
+        </div>
+      )}
       <div className="guide-footer">
         <button
           className="primary"

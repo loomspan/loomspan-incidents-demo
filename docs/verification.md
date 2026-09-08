@@ -1,5 +1,30 @@
 # Verification record
 
+## Focused framework tour — 2026-09-08
+
+- Final packaging passed frontend type checking, production bundling and all
+  **48 deterministic tests**; eight opt-in live tests were skipped in that build
+  (`target/tour-package.log`).
+- The three featured live cases passed twice each: selective deployment/network
+  investigation, two-stage cache recovery, and Responder/Commander handoff.
+  Logs: `target/tour-live-1.log` and `target/tour-live-2.log`. This is six passing
+  cases across two smoke runs, not a reliability-rate estimate.
+- The selective case now asserts that the first investigation has application
+  evidence and no network probe; its second investigation has application,
+  network and database evidence. The new handoff case exercises a real Responder
+  model invocation, blocked automatic repair and subsequent Commander recovery.
+- Concurrency remains conditional on the actual generated group and observed
+  sibling overlap. The tour does not infer concurrency from successful recovery
+  or overlapping parent/child timing bars.
+- Desktop browser checks verified the featured tour, extra-scenario grouping,
+  successful session-ID copying and historical execution access. The saved
+  INC-006 cache execution showed overlapping application, capacity and database
+  specialist intervals, followed by the evidence reader. This is public-observer
+  timing evidence, not a Console plan inspection. Mobile was not device-tested.
+- No simulator, repair-loop, security-policy or database-schema changes were made.
+  Console connection and trace retrieval were not verified: no Console MCP tools
+  were available. The inspection panel and guide state that limitation explicitly.
+
 ## DNS and layered connectivity — 2026-09-07
 
 - **48 deterministic tests passed**, with seven opt-in live tests skipped in the

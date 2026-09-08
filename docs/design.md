@@ -78,3 +78,7 @@ execution checks the saved recommendation, not an arbitrary browser-supplied act
    mission semantics make that useful without hidden state propagation.
 
 Authenticated roles and repair handoff are implemented; see [operator roles](operator-roles.md).
+
+The primary presentation is the [three-walkthrough framework tour](framework-tour.md).
+Further scenarios are optional; feature claims distinguish framework execution
+from application simulation, repair policy and persistence.

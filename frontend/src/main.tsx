@@ -10,6 +10,7 @@ import type {
   Recovery,
 } from "./types";
 import "./style.css";
+import { ConsoleInspection } from "./console-inspection";
 import { Session, csrfHeaders, type Operator } from "./session";
 import {
   ScenarioGuide,
@@ -93,7 +94,7 @@ function App({ operator, logout }: { operator: Operator; logout: () => void }) {
         action,
       ));
   const [guide, setGuide] = useState(
-    sessionStorage.getItem("relay.guide") || "cache-compound",
+    sessionStorage.getItem("relay.guide") || "compound",
   );
   const [mode, setMode] = useState("RECOMMEND");
   const [allowedActions, setAllowedActions] = useState([
@@ -1242,6 +1243,22 @@ function App({ operator, logout }: { operator: Operator; logout: () => void }) {
                               · {rec.reason}
                             </p>
                           ))}
+                          <Coordination run={r} />
+                          {r.correction && (
+                            <div className="correction-record">
+                              <h4>
+                                Report correction ·{" "}
+                                {statusText(r.correction.status)}
+                              </h4>
+                              <Coordination
+                                run={{
+                                  ...r,
+                                  sessionId: r.correction.sessionId,
+                                  events: r.correction.events,
+                                }}
+                              />
+                            </div>
+                          )}
                           {r.evidence.map((e) => (
                             <Evidence key={e.id} receipt={e} cited={false} />
                           ))}
@@ -1324,6 +1341,7 @@ function Coordination({ run }: { run?: Run }) {
   const total = Math.max(1, endTime - startTime);
   return (
     <div className="coordination">
+      <ConsoleInspection key={run.sessionId || run.id} run={run} />
       <div className="session">
         <span>LOOMSPAN SESSION</span>
         <code>{run.sessionId}</code>
